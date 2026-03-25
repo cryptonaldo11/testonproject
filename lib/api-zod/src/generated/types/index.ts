@@ -31,6 +31,7 @@ export * from "./createWorkerRequest";
 export * from "./departmentListResponse";
 export * from "./departmentResponse";
 export * from "./errorResponse";
+export * from "./faceDescriptorResponse";
 export * from "./getAttendanceSummaryParams";
 export * from "./getLeaveBalanceParams";
 export * from "./getWorkerParams";

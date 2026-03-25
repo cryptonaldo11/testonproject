@@ -438,6 +438,11 @@ export interface CreateRoleRequest {
   permissions?: string;
 }
 
+export interface FaceDescriptorResponse {
+  registered: boolean;
+  descriptor?: string | null;
+}
+
 export interface WorkerResponse {
   id: number;
   userId: number;

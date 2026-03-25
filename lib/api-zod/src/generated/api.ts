@@ -791,6 +791,14 @@ export const RequestUploadUrlResponse = zod.object({
 });
 
 /**
+ * @summary Get the logged-in worker's registered face descriptor
+ */
+export const GetMyFaceDescriptorResponse = zod.object({
+  registered: zod.boolean(),
+  descriptor: zod.string().nullish(),
+});
+
+/**
  * @summary Register face descriptor for a worker (admin/hr)
  */
 export const RegisterFaceParams = zod.object({

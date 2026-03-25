@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/lib/auth";
-import { useCheckIn, useCheckOut, useListAttendance } from "@workspace/api-client-react";
+import { useCheckIn, useCheckOut, useListAttendance, useGetMyFaceDescriptor } from "@workspace/api-client-react";
 import { Card, CardContent, Button } from "@/components/ui/core";
 import { Clock, MapPin, CheckCircle2, Camera, CameraOff, AlertCircle } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
@@ -127,8 +127,6 @@ export default function CheckIn() {
   const [time, setTime] = useState(new Date());
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [registeredDescriptor, setRegisteredDescriptor] = useState<number[] | null>(null);
-  const [descriptorLoaded, setDescriptorLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -147,6 +145,15 @@ export default function CheckIn() {
     { query: { enabled: !!user?.id } }
   );
 
+  const { data: faceDescriptorData, isLoading: isLoadingDescriptor } = useGetMyFaceDescriptor(
+    { query: { enabled: !!user?.id } }
+  );
+
+  const registeredDescriptor = faceDescriptorData?.registered && faceDescriptorData.descriptor
+    ? faceDescriptorData.descriptor.split(",").map(Number)
+    : null;
+  const descriptorLoaded = !isLoadingDescriptor;
+
   const [checkInError, setCheckInError] = useState<string | null>(null);
 
   const checkInMutation = useCheckIn({
@@ -163,25 +170,6 @@ export default function CheckIn() {
   const todayLog = attendanceData?.logs?.[0];
   const isCheckedIn = !!todayLog?.checkIn;
   const isCheckedOut = !!todayLog?.checkOut;
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    fetch("/api/workers/me/face-descriptor", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then((data: { registered: boolean; descriptor: string | null }) => {
-        if (data.registered && data.descriptor) {
-          const nums = data.descriptor.split(",").map(Number);
-          setRegisteredDescriptor(nums);
-        }
-        setDescriptorLoaded(true);
-      })
-      .catch(() => setDescriptorLoaded(true));
-  }, [user?.id]);
 
   const isFaceMatched = faceDetected && registeredDescriptor !== null && matchScore !== null && matchScore > 0;
   const faceMatchDistance = faceDetected && registeredDescriptor !== null && matchScore !== null

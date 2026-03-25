@@ -36,6 +36,7 @@ import type {
   DepartmentListResponse,
   DepartmentResponse,
   ErrorResponse,
+  FaceDescriptorResponse,
   GetAttendanceSummaryParams,
   GetLeaveBalanceParams,
   HealthStatus,
@@ -3168,6 +3169,81 @@ export const useRequestUploadUrl = <
 > => {
   return useMutation(getRequestUploadUrlMutationOptions(options));
 };
+
+/**
+ * @summary Get the logged-in worker's registered face descriptor
+ */
+export const getGetMyFaceDescriptorUrl = () => {
+  return `/api/workers/me/face-descriptor`;
+};
+
+export const getMyFaceDescriptor = async (
+  options?: RequestInit,
+): Promise<FaceDescriptorResponse> => {
+  return customFetch<FaceDescriptorResponse>(getGetMyFaceDescriptorUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMyFaceDescriptorQueryKey = () => {
+  return [`/api/workers/me/face-descriptor`] as const;
+};
+
+export const getGetMyFaceDescriptorQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyFaceDescriptor>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyFaceDescriptor>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMyFaceDescriptorQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMyFaceDescriptor>>
+  > = ({ signal }) => getMyFaceDescriptor({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyFaceDescriptor>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyFaceDescriptorQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyFaceDescriptor>>
+>;
+export type GetMyFaceDescriptorQueryError = ErrorType<void>;
+
+/**
+ * @summary Get the logged-in worker's registered face descriptor
+ */
+
+export function useGetMyFaceDescriptor<
+  TData = Awaited<ReturnType<typeof getMyFaceDescriptor>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyFaceDescriptor>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyFaceDescriptorQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Register face descriptor for a worker (admin/hr)
