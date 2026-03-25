@@ -5,7 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/core";
 import { Users, Clock, CalendarX, TrendingUp, AlertTriangle, FileText } from "lucide-react";
 import { useListUsers, useListAttendance, useListLeaves, useListAlerts } from "@workspace/api-client-react";
 
-function StatCard({ title, value, icon: Icon, trend, trendUp }: any) {
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  trend?: string;
+  trendUp?: boolean;
+}
+
+function StatCard({ title, value, icon: Icon, trend, trendUp }: StatCardProps) {
   return (
     <Card className="hover:-translate-y-1 transition-transform duration-300">
       <CardContent className="p-6">

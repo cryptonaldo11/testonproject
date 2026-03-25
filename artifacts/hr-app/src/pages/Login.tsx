@@ -19,7 +19,7 @@ export default function Login() {
         login(data.token);
         setLocation("/dashboard");
       },
-      onError: (err: any) => {
+      onError: (err: Error & { response?: { data?: { error?: string } } }) => {
         setError(err?.response?.data?.error || "Invalid credentials");
       }
     }

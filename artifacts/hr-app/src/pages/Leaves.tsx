@@ -25,7 +25,7 @@ export default function Leaves() {
       createLeaveMutation.mutate({
         data: {
           userId: user.id,
-          leaveType: fd.get("leaveType") as any,
+          leaveType: fd.get("leaveType") as "annual" | "medical" | "emergency" | "unpaid" | "other",
           startDate: fd.get("startDate") as string,
           endDate: fd.get("endDate") as string,
           reason: fd.get("reason") as string,
@@ -34,7 +34,7 @@ export default function Leaves() {
     }
   };
 
-  const handleStatusChange = (id: number, status: any) => {
+  const handleStatusChange = (id: number, status: "pending" | "approved" | "rejected" | "cancelled") => {
     updateLeaveMutation.mutate({ id, data: { status } });
   };
 
