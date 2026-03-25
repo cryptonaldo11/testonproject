@@ -363,6 +363,8 @@ export const CheckInResponse = zod.object({
  */
 export const CheckOutBody = zod.object({
   userId: zod.number(),
+  faceDescriptor: zod.string().nullish(),
+  faceMatchScore: zod.string().nullish(),
 });
 
 export const CheckOutResponse = zod.object({

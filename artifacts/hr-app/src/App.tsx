@@ -16,6 +16,7 @@ import Departments from "@/pages/Departments";
 import Alerts from "@/pages/Alerts";
 import ManHours from "@/pages/ManHours";
 import Productivity from "@/pages/Productivity";
+import FaceRegistration from "@/pages/FaceRegistration";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/departments" component={Departments} />
       <Route path="/alerts" component={Alerts} />
       <Route path="/productivity" component={Productivity} />
+      <Route path="/face-registration" component={FaceRegistration} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1344,6 +1344,12 @@ components:
       properties:
         userId:
           type: number
+        faceDescriptor:
+          type: string
+          nullable: true
+        faceMatchScore:
+          type: string
+          nullable: true
       required:
         - userId
 

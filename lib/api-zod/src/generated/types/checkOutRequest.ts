@@ -8,4 +8,6 @@
 
 export interface CheckOutRequest {
   userId: number;
+  faceDescriptor?: string | null;
+  faceMatchScore?: string | null;
 }

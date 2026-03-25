@@ -165,7 +165,6 @@ export default function CheckIn() {
       },
     }
   });
-  const checkOutMutation = useCheckOut({ mutation: { onSuccess: () => refetch() } });
 
   const todayLog = attendanceData?.logs?.[0];
   const isCheckedIn = !!todayLog?.checkIn;
@@ -229,9 +228,28 @@ export default function CheckIn() {
     });
   };
 
+  const [checkOutError, setCheckOutError] = useState<string | null>(null);
+
+  const checkOutMutationWithFace = useCheckOut({
+    mutation: {
+      onSuccess: () => { refetch(); setCheckOutError(null); },
+      onError: (err) => {
+        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        setCheckOutError(msg ?? "Check-out failed. Please try again.");
+      },
+    }
+  });
+
   const handleCheckOut = () => {
     if (!user?.id) return;
-    checkOutMutation.mutate({ data: { userId: user.id } });
+    if (faceVerificationRequired && !isFaceMatched) return;
+    checkOutMutationWithFace.mutate({
+      data: {
+        userId: user.id,
+        faceDescriptor: faceDescriptor ?? undefined,
+        faceMatchScore: faceMatchScoreStr,
+      }
+    });
   };
 
   const getFaceStatusBanner = () => {
@@ -341,10 +359,17 @@ export default function CheckIn() {
                 </div>
               )}
 
-              {faceVerificationRequired && !faceVerificationPassed && !isCheckedIn && (
+              {faceVerificationRequired && !faceVerificationPassed && (
                 <div className="w-full flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-800 text-sm px-4 py-3 rounded-xl">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   Face verification required. Turn on camera and ensure your face is recognized.
+                </div>
+              )}
+
+              {checkOutError && (
+                <div className="w-full flex items-center gap-2 bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-3 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {checkOutError}
                 </div>
               )}
 
@@ -364,8 +389,9 @@ export default function CheckIn() {
                   size="lg"
                   variant="outline"
                   className="flex-1 text-lg h-16 border-2"
-                  disabled={!isCheckedIn || isCheckedOut || checkOutMutation.isPending}
+                  disabled={!isCheckedIn || isCheckedOut || checkOutMutationWithFace.isPending || !faceVerificationPassed}
                   onClick={handleCheckOut}
+                  title={faceVerificationRequired && !faceVerificationPassed ? "Face verification required for check-out" : undefined}
                 >
                   Check Out
                 </Button>

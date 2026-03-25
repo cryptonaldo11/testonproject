@@ -162,6 +162,27 @@ router.post("/attendance/checkout", requireAuth, async (req, res): Promise<void>
     return;
   }
 
+  // Server-side face descriptor validation for check-out
+  const [workerForCheckout] = await db
+    .select({ faceDescriptor: workersTable.faceDescriptor })
+    .from(workersTable)
+    .where(eq(workersTable.userId, parsed.data.userId));
+
+  if (workerForCheckout?.faceDescriptor) {
+    const submittedDescriptorStr = parsed.data.faceDescriptor;
+    if (!submittedDescriptorStr) {
+      res.status(422).json({ error: "Face verification required: no descriptor submitted" });
+      return;
+    }
+    const submitted = submittedDescriptorStr.split(",").map(Number);
+    const registered = workerForCheckout.faceDescriptor.split(",").map(Number);
+    const distance = euclideanDistance(submitted, registered);
+    if (distance > FACE_MATCH_THRESHOLD) {
+      res.status(422).json({ error: "Face verification failed: face not recognized" });
+      return;
+    }
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date();
 

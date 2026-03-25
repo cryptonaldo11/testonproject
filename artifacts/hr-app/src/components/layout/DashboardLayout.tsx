@@ -12,7 +12,8 @@ import {
   LogOut, 
   Menu,
   Activity,
-  BarChart3
+  BarChart3,
+  ScanFace
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: "Productivity", href: "/productivity", icon: Activity, show: true },
     { label: "Employees", href: "/users", icon: Users, show: isAdmin },
     { label: "Departments", href: "/departments", icon: Building2, show: isAdmin },
+    { label: "Face Registration", href: "/face-registration", icon: ScanFace, show: isHR },
     { label: "Alerts", href: "/alerts", icon: Bell, show: true },
   ].filter(item => item.show);
 
