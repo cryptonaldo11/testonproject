@@ -1,9 +1,16 @@
 import { Router, type IRouter } from "express";
-import { db, rolesTable } from "@workspace/db";
+import { db, rolesTable, insertRoleSchema } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { z } from "zod/v4";
 import { requireAuth, requireRole } from "../lib/auth";
 
 const router: IRouter = Router();
+
+const createRoleBodySchema = insertRoleSchema.pick({
+  name: true,
+  description: true,
+  permissions: true,
+});
 
 function mapRole(r: typeof rolesTable.$inferSelect) {
   return {
@@ -22,16 +29,16 @@ router.get("/roles", requireAuth, async (_req, res): Promise<void> => {
 });
 
 router.post("/roles", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const { name, description, permissions } = req.body as { name?: string; description?: string; permissions?: string };
-  if (!name || typeof name !== "string") {
-    res.status(400).json({ error: "name is required" });
+  const parsed = createRoleBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed", details: parsed.error.issues });
     return;
   }
 
   const [role] = await db.insert(rolesTable).values({
-    name,
-    description: description ?? null,
-    permissions: permissions ?? "[]",
+    name: parsed.data.name,
+    description: parsed.data.description ?? null,
+    permissions: parsed.data.permissions ?? "[]",
   }).returning();
 
   res.status(201).json(mapRole(role));

@@ -1,9 +1,32 @@
 import { Router, type IRouter } from "express";
-import { db, workersTable, type WorkerStatus } from "@workspace/db";
+import { db, workersTable, insertWorkerSchema, type WorkerStatus } from "@workspace/db";
 import { eq, and, SQL } from "drizzle-orm";
+import { z } from "zod/v4";
 import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
 
 const router: IRouter = Router();
+
+const createWorkerBodySchema = insertWorkerSchema.pick({
+  userId: true,
+  departmentId: true,
+  employeeId: true,
+  jobTitle: true,
+  workLocation: true,
+  contractType: true,
+  status: true,
+  startDate: true,
+  endDate: true,
+});
+
+const updateWorkerBodySchema = insertWorkerSchema.pick({
+  departmentId: true,
+  jobTitle: true,
+  workLocation: true,
+  contractType: true,
+  status: true,
+  startDate: true,
+  endDate: true,
+}).partial();
 
 function mapWorker(w: typeof workersTable.$inferSelect) {
   return {
@@ -47,33 +70,22 @@ router.get("/workers", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/workers", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
-  const body = req.body as {
-    userId?: number;
-    departmentId?: number;
-    employeeId?: string;
-    jobTitle?: string;
-    workLocation?: string;
-    contractType?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  };
-
-  if (!body.userId || typeof body.userId !== "number") {
-    res.status(400).json({ error: "userId is required" });
+  const parsed = createWorkerBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed", details: parsed.error.issues });
     return;
   }
 
   const [worker] = await db.insert(workersTable).values({
-    userId: body.userId,
-    departmentId: body.departmentId ?? null,
-    employeeId: body.employeeId ?? null,
-    jobTitle: body.jobTitle ?? null,
-    workLocation: body.workLocation ?? null,
-    contractType: body.contractType ?? "full_time",
-    status: (body.status as WorkerStatus) ?? "active",
-    startDate: body.startDate ?? null,
-    endDate: body.endDate ?? null,
+    userId: parsed.data.userId,
+    departmentId: parsed.data.departmentId ?? null,
+    employeeId: parsed.data.employeeId ?? null,
+    jobTitle: parsed.data.jobTitle ?? null,
+    workLocation: parsed.data.workLocation ?? null,
+    contractType: parsed.data.contractType ?? "full_time",
+    status: (parsed.data.status as WorkerStatus) ?? "active",
+    startDate: parsed.data.startDate ?? null,
+    endDate: parsed.data.endDate ?? null,
   }).returning();
 
   res.status(201).json(mapWorker(worker));
@@ -108,24 +120,20 @@ router.patch("/workers/:id", requireAuth, requireRole("admin", "hr"), async (req
     return;
   }
 
-  const body = req.body as {
-    departmentId?: number;
-    jobTitle?: string;
-    workLocation?: string;
-    contractType?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  };
+  const parsed = updateWorkerBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed", details: parsed.error.issues });
+    return;
+  }
 
   const updateData: Partial<typeof workersTable.$inferInsert> = {};
-  if (body.departmentId !== undefined) updateData.departmentId = body.departmentId;
-  if (body.jobTitle !== undefined) updateData.jobTitle = body.jobTitle;
-  if (body.workLocation !== undefined) updateData.workLocation = body.workLocation;
-  if (body.contractType !== undefined) updateData.contractType = body.contractType;
-  if (body.status !== undefined) updateData.status = body.status as WorkerStatus;
-  if (body.startDate !== undefined) updateData.startDate = body.startDate;
-  if (body.endDate !== undefined) updateData.endDate = body.endDate;
+  if (parsed.data.departmentId !== undefined) updateData.departmentId = parsed.data.departmentId;
+  if (parsed.data.jobTitle !== undefined) updateData.jobTitle = parsed.data.jobTitle;
+  if (parsed.data.workLocation !== undefined) updateData.workLocation = parsed.data.workLocation;
+  if (parsed.data.contractType !== undefined) updateData.contractType = parsed.data.contractType;
+  if (parsed.data.status !== undefined) updateData.status = parsed.data.status as WorkerStatus;
+  if (parsed.data.startDate !== undefined) updateData.startDate = parsed.data.startDate;
+  if (parsed.data.endDate !== undefined) updateData.endDate = parsed.data.endDate;
 
   const [worker] = await db.update(workersTable)
     .set(updateData)

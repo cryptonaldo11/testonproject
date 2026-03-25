@@ -60,15 +60,26 @@ artifacts-monorepo/
 └── package.json
 ```
 
-## Database Schema (7 Tables)
+## Environment Variables / Secrets
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string (Replit DB auto-provisioned) |
+| `JWT_SECRET` | **Yes** | Secret key for signing/verifying JWT tokens. **The API server will refuse to start if this is not set.** Set via Replit Secrets. |
+
+> **Important**: `JWT_SECRET` must be configured as a Replit Secret before the API server can start. Without it, the server will throw an error on boot.
+
+## Database Schema (9 Tables)
 
 1. **departments** — id, name, description, timestamps
-2. **users** — id, employee_id, name, email, password_hash, role, department_id, phone, position, hourly_rate, is_active, has_face_registered, timestamps
-3. **attendance_logs** — id, user_id, check_in, check_out, check_in_location, check_out_location, check_in_face_verified, check_out_face_verified, notes, timestamps
-4. **leave_applications** — id, user_id, leave_type, start_date, end_date, reason, status, approved_by, timestamps
-5. **medical_certificates** — id, user_id, leave_application_id, doctor_name, clinic_name, diagnosis, mc_date, mc_days, file_url, timestamps
-6. **alerts** — id, type, severity, title, message, user_id, is_read, resolved_at, timestamps
-7. **productivity_scores** — id, user_id, period_start, period_end, attendance_score, punctuality_score, leave_score, overall_score, ai_classification, notes, timestamps
+2. **roles** — id, name, description, permissions (JSON string), timestamps
+3. **users** — id, employee_id, name, email, password_hash, role, department_id, phone, position, hourly_rate, is_active, has_face_registered, timestamps
+4. **workers** — id, user_id, department_id, employee_id, job_title, work_location, contract_type, status, start_date, end_date, face_descriptor, timestamps
+5. **attendance_logs** — id, user_id, check_in, check_out, check_in_location, check_out_location, check_in_face_verified, check_out_face_verified, notes, timestamps
+6. **leave_applications** — id, user_id, leave_type, start_date, end_date, reason, status, approved_by, timestamps
+7. **medical_certificates** — id, user_id, leave_application_id, doctor_name, clinic_name, diagnosis, mc_date, mc_days, file_url, timestamps
+8. **alerts** — id, type, severity, title, message, user_id, is_read, resolved_at, timestamps
+9. **productivity_scores** — id, user_id, period_start, period_end, attendance_score, punctuality_score, leave_score, overall_score, ai_classification, notes, timestamps
 
 ## API Routes
 
