@@ -418,6 +418,78 @@ export interface ProductivityListResponse {
   total: number;
 }
 
+export interface RoleResponse {
+  id: number;
+  name: string;
+  description?: string | null;
+  permissions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoleListResponse {
+  roles: RoleResponse[];
+  total: number;
+}
+
+export interface CreateRoleRequest {
+  name: string;
+  description?: string;
+  permissions?: string;
+}
+
+export interface WorkerResponse {
+  id: number;
+  userId: number;
+  departmentId?: number | null;
+  employeeId?: string | null;
+  jobTitle?: string | null;
+  workLocation?: string | null;
+  contractType?: string | null;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  hasFaceRegistered: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkerListResponse {
+  workers: WorkerResponse[];
+  total: number;
+}
+
+export interface CreateWorkerRequest {
+  userId: number;
+  departmentId?: number;
+  employeeId?: string;
+  jobTitle?: string;
+  workLocation?: string;
+  contractType?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface UpdateWorkerRequest {
+  departmentId?: number;
+  jobTitle?: string;
+  workLocation?: string;
+  contractType?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface GetWorkerParams {
+  id: number;
+}
+
+export interface ListWorkersQueryParams {
+  departmentId?: number;
+  status?: string;
+}
+
 export type ListUsersParams = {
   role?: string;
   departmentId?: number;
@@ -465,4 +537,9 @@ export type ListProductivityScoresParams = {
   userId?: number;
   month?: string;
   year?: string;
+};
+
+export type ListWorkersParams = {
+  departmentId?: number;
+  status?: string;
 };

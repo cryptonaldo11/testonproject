@@ -1,10 +1,11 @@
-import { db, departmentsTable, usersTable } from "@workspace/db";
+import { db, departmentsTable, usersTable, rolesTable, workersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 async function seed() {
   console.log("Seeding database...");
 
+  // --- Departments ---
   const deptValues = [
     { name: "Landscape Operations", description: "Field workers and landscape crew" },
     { name: "Contracting", description: "Construction and contracting teams" },
@@ -24,12 +25,28 @@ async function seed() {
   for (const d of allDepts) {
     deptMap[d.name] = d.id;
   }
-
   console.log("Departments ready:", Object.keys(deptMap));
 
+  // --- Roles ---
+  const roleValues = [
+    { name: "admin", description: "System administrator — full access", permissions: '["*"]' },
+    { name: "hr", description: "HR manager — manage employees, approve leaves, view reports", permissions: '["users:read","users:write","attendance:read","leaves:read","leaves:write","reports:read","alerts:read","medical:read"]' },
+    { name: "worker", description: "Field worker — own attendance, leave applications, MCs", permissions: '["attendance:own","leaves:own","medical:own"]' },
+    { name: "driver", description: "Driver — own attendance, leave applications, MCs", permissions: '["attendance:own","leaves:own","medical:own"]' },
+  ];
+
+  for (const role of roleValues) {
+    const existing = await db.select().from(rolesTable).where(eq(rolesTable.name, role.name));
+    if (existing.length === 0) {
+      await db.insert(rolesTable).values(role);
+      console.log(`Created role: ${role.name}`);
+    }
+  }
+
+  // --- Users ---
   const hashPass = async (p: string) => bcrypt.hash(p, 10);
 
-  const users = [
+  const usersToSeed = [
     {
       name: "Admin User",
       email: "admin@teston.com",
@@ -104,13 +121,70 @@ async function seed() {
     },
   ];
 
-  for (const user of users) {
+  const userMap: Record<string, number> = {};
+
+  for (const user of usersToSeed) {
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, user.email));
     if (existing.length === 0) {
-      await db.insert(usersTable).values(user);
+      const [created] = await db.insert(usersTable).values(user).returning();
+      userMap[user.email] = created.id;
       console.log(`Created user: ${user.name} (${user.email}) — role: ${user.role}`);
     } else {
+      userMap[user.email] = existing[0].id;
       console.log(`User already exists: ${user.email}`);
+    }
+  }
+
+  // --- Workers (worker/driver role users get a worker record) ---
+  const workerEntries = [
+    {
+      userId: userMap["worker1@teston.com"],
+      departmentId: deptMap["Landscape Operations"],
+      employeeId: "EMP003",
+      jobTitle: "Landscape Technician",
+      workLocation: "Tannery Lane Site A",
+      contractType: "full_time",
+      status: "active" as const,
+      startDate: "2024-01-15",
+    },
+    {
+      userId: userMap["worker2@teston.com"],
+      departmentId: deptMap["Contracting"],
+      employeeId: "EMP004",
+      jobTitle: "Construction Worker",
+      workLocation: "Tannery Lane Site B",
+      contractType: "full_time",
+      status: "active" as const,
+      startDate: "2024-03-01",
+    },
+    {
+      userId: userMap["driver1@teston.com"],
+      departmentId: deptMap["Drivers"],
+      employeeId: "EMP005",
+      jobTitle: "Driver",
+      workLocation: "Vehicle Pool",
+      contractType: "full_time",
+      status: "active" as const,
+      startDate: "2023-06-01",
+    },
+    {
+      userId: userMap["driver2@teston.com"],
+      departmentId: deptMap["Drivers"],
+      employeeId: "EMP006",
+      jobTitle: "Senior Driver",
+      workLocation: "Vehicle Pool",
+      contractType: "full_time",
+      status: "active" as const,
+      startDate: "2022-11-01",
+    },
+  ];
+
+  for (const entry of workerEntries) {
+    if (!entry.userId) continue;
+    const existing = await db.select().from(workersTable).where(eq(workersTable.userId, entry.userId));
+    if (existing.length === 0) {
+      await db.insert(workersTable).values(entry);
+      console.log(`Created worker record for userId: ${entry.userId}`);
     }
   }
 

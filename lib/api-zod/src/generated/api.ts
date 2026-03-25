@@ -775,3 +775,145 @@ export const GetUserProductivityResponse = zod.object({
   ),
   total: zod.number(),
 });
+
+/**
+ * @summary List all roles
+ */
+export const ListRolesResponse = zod.object({
+  roles: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      description: zod.string().nullish(),
+      permissions: zod.string(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Create a role (admin only)
+ */
+export const CreateRoleBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  permissions: zod.string().optional(),
+});
+
+/**
+ * @summary Get a role by ID
+ */
+export const GetRoleParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetRoleResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  permissions: zod.string(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary List workers
+ */
+export const ListWorkersQueryParams = zod.object({
+  departmentId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const ListWorkersResponse = zod.object({
+  workers: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      departmentId: zod.number().nullish(),
+      employeeId: zod.string().nullish(),
+      jobTitle: zod.string().nullish(),
+      workLocation: zod.string().nullish(),
+      contractType: zod.string().nullish(),
+      status: zod.string(),
+      startDate: zod.string().nullish(),
+      endDate: zod.string().nullish(),
+      hasFaceRegistered: zod.boolean(),
+      createdAt: zod.string(),
+      updatedAt: zod.string(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Create a worker record (admin/hr only)
+ */
+export const CreateWorkerBody = zod.object({
+  userId: zod.number(),
+  departmentId: zod.number().optional(),
+  employeeId: zod.string().optional(),
+  jobTitle: zod.string().optional(),
+  workLocation: zod.string().optional(),
+  contractType: zod.string().optional(),
+  status: zod.string().optional(),
+  startDate: zod.string().optional(),
+  endDate: zod.string().optional(),
+});
+
+/**
+ * @summary Get worker by ID
+ */
+export const GetWorkerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetWorkerResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  departmentId: zod.number().nullish(),
+  employeeId: zod.string().nullish(),
+  jobTitle: zod.string().nullish(),
+  workLocation: zod.string().nullish(),
+  contractType: zod.string().nullish(),
+  status: zod.string(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  hasFaceRegistered: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Update worker record (admin/hr only)
+ */
+export const UpdateWorkerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateWorkerBody = zod.object({
+  departmentId: zod.number().optional(),
+  jobTitle: zod.string().optional(),
+  workLocation: zod.string().optional(),
+  contractType: zod.string().optional(),
+  status: zod.string().optional(),
+  startDate: zod.string().optional(),
+  endDate: zod.string().optional(),
+});
+
+export const UpdateWorkerResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  departmentId: zod.number().nullish(),
+  employeeId: zod.string().nullish(),
+  jobTitle: zod.string().nullish(),
+  workLocation: zod.string().nullish(),
+  contractType: zod.string().nullish(),
+  status: zod.string(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  hasFaceRegistered: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});

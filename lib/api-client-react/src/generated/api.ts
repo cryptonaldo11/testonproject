@@ -30,7 +30,9 @@ import type {
   CreateDepartmentRequest,
   CreateLeaveRequest,
   CreateMedicalCertificateRequest,
+  CreateRoleRequest,
   CreateUserRequest,
+  CreateWorkerRequest,
   DepartmentListResponse,
   DepartmentResponse,
   ErrorResponse,
@@ -46,19 +48,25 @@ import type {
   ListMedicalCertificatesParams,
   ListProductivityScoresParams,
   ListUsersParams,
+  ListWorkersParams,
   LoginRequest,
   MedicalCertificateListResponse,
   MedicalCertificateResponse,
   MessageResponse,
   ProductivityListResponse,
+  RoleListResponse,
+  RoleResponse,
   UpdateAlertRequest,
   UpdateAttendanceRequest,
   UpdateDepartmentRequest,
   UpdateLeaveRequest,
   UpdateMedicalCertificateRequest,
   UpdateUserRequest,
+  UpdateWorkerRequest,
   UserListResponse,
   UserResponse,
+  WorkerListResponse,
+  WorkerResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -3071,3 +3079,585 @@ export function useGetUserProductivity<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List all roles
+ */
+export const getListRolesUrl = () => {
+  return `/api/roles`;
+};
+
+export const listRoles = async (
+  options?: RequestInit,
+): Promise<RoleListResponse> => {
+  return customFetch<RoleListResponse>(getListRolesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListRolesQueryKey = () => {
+  return [`/api/roles`] as const;
+};
+
+export const getListRolesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listRoles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listRoles>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListRolesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listRoles>>> = ({
+    signal,
+  }) => listRoles({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listRoles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListRolesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listRoles>>
+>;
+export type ListRolesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all roles
+ */
+
+export function useListRoles<
+  TData = Awaited<ReturnType<typeof listRoles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listRoles>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListRolesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a role (admin only)
+ */
+export const getCreateRoleUrl = () => {
+  return `/api/roles`;
+};
+
+export const createRole = async (
+  createRoleRequest: CreateRoleRequest,
+  options?: RequestInit,
+): Promise<RoleResponse> => {
+  return customFetch<RoleResponse>(getCreateRoleUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createRoleRequest),
+  });
+};
+
+export const getCreateRoleMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRole>>,
+    TError,
+    { data: BodyType<CreateRoleRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createRole>>,
+  TError,
+  { data: BodyType<CreateRoleRequest> },
+  TContext
+> => {
+  const mutationKey = ["createRole"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createRole>>,
+    { data: BodyType<CreateRoleRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createRole(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateRoleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createRole>>
+>;
+export type CreateRoleMutationBody = BodyType<CreateRoleRequest>;
+export type CreateRoleMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a role (admin only)
+ */
+export const useCreateRole = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRole>>,
+    TError,
+    { data: BodyType<CreateRoleRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createRole>>,
+  TError,
+  { data: BodyType<CreateRoleRequest> },
+  TContext
+> => {
+  return useMutation(getCreateRoleMutationOptions(options));
+};
+
+/**
+ * @summary Get a role by ID
+ */
+export const getGetRoleUrl = (id: number) => {
+  return `/api/roles/${id}`;
+};
+
+export const getRole = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RoleResponse> => {
+  return customFetch<RoleResponse>(getGetRoleUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRoleQueryKey = (id: number) => {
+  return [`/api/roles/${id}`] as const;
+};
+
+export const getGetRoleQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRole>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getRole>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRoleQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRole>>> = ({
+    signal,
+  }) => getRole(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getRole>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetRoleQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRole>>
+>;
+export type GetRoleQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get a role by ID
+ */
+
+export function useGetRole<
+  TData = Awaited<ReturnType<typeof getRole>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getRole>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoleQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List workers
+ */
+export const getListWorkersUrl = (params?: ListWorkersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/workers?${stringifiedParams}`
+    : `/api/workers`;
+};
+
+export const listWorkers = async (
+  params?: ListWorkersParams,
+  options?: RequestInit,
+): Promise<WorkerListResponse> => {
+  return customFetch<WorkerListResponse>(getListWorkersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListWorkersQueryKey = (params?: ListWorkersParams) => {
+  return [`/api/workers`, ...(params ? [params] : [])] as const;
+};
+
+export const getListWorkersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWorkers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListWorkersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listWorkers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListWorkersQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkers>>> = ({
+    signal,
+  }) => listWorkers(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listWorkers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListWorkersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWorkers>>
+>;
+export type ListWorkersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List workers
+ */
+
+export function useListWorkers<
+  TData = Awaited<ReturnType<typeof listWorkers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListWorkersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listWorkers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListWorkersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a worker record (admin/hr only)
+ */
+export const getCreateWorkerUrl = () => {
+  return `/api/workers`;
+};
+
+export const createWorker = async (
+  createWorkerRequest: CreateWorkerRequest,
+  options?: RequestInit,
+): Promise<WorkerResponse> => {
+  return customFetch<WorkerResponse>(getCreateWorkerUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createWorkerRequest),
+  });
+};
+
+export const getCreateWorkerMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createWorker>>,
+    TError,
+    { data: BodyType<CreateWorkerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createWorker>>,
+  TError,
+  { data: BodyType<CreateWorkerRequest> },
+  TContext
+> => {
+  const mutationKey = ["createWorker"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createWorker>>,
+    { data: BodyType<CreateWorkerRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createWorker(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateWorkerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createWorker>>
+>;
+export type CreateWorkerMutationBody = BodyType<CreateWorkerRequest>;
+export type CreateWorkerMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a worker record (admin/hr only)
+ */
+export const useCreateWorker = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createWorker>>,
+    TError,
+    { data: BodyType<CreateWorkerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createWorker>>,
+  TError,
+  { data: BodyType<CreateWorkerRequest> },
+  TContext
+> => {
+  return useMutation(getCreateWorkerMutationOptions(options));
+};
+
+/**
+ * @summary Get worker by ID
+ */
+export const getGetWorkerUrl = (id: number) => {
+  return `/api/workers/${id}`;
+};
+
+export const getWorker = async (
+  id: number,
+  options?: RequestInit,
+): Promise<WorkerResponse> => {
+  return customFetch<WorkerResponse>(getGetWorkerUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWorkerQueryKey = (id: number) => {
+  return [`/api/workers/${id}`] as const;
+};
+
+export const getGetWorkerQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorker>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWorker>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetWorkerQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorker>>> = ({
+    signal,
+  }) => getWorker(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getWorker>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetWorkerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorker>>
+>;
+export type GetWorkerQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get worker by ID
+ */
+
+export function useGetWorker<
+  TData = Awaited<ReturnType<typeof getWorker>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWorker>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWorkerQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update worker record (admin/hr only)
+ */
+export const getUpdateWorkerUrl = (id: number) => {
+  return `/api/workers/${id}`;
+};
+
+export const updateWorker = async (
+  id: number,
+  updateWorkerRequest: UpdateWorkerRequest,
+  options?: RequestInit,
+): Promise<WorkerResponse> => {
+  return customFetch<WorkerResponse>(getUpdateWorkerUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateWorkerRequest),
+  });
+};
+
+export const getUpdateWorkerMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateWorker>>,
+    TError,
+    { id: number; data: BodyType<UpdateWorkerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateWorker>>,
+  TError,
+  { id: number; data: BodyType<UpdateWorkerRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateWorker"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateWorker>>,
+    { id: number; data: BodyType<UpdateWorkerRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateWorker(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateWorkerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateWorker>>
+>;
+export type UpdateWorkerMutationBody = BodyType<UpdateWorkerRequest>;
+export type UpdateWorkerMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update worker record (admin/hr only)
+ */
+export const useUpdateWorker = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateWorker>>,
+    TError,
+    { id: number; data: BodyType<UpdateWorkerRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateWorker>>,
+  TError,
+  { id: number; data: BodyType<UpdateWorkerRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateWorkerMutationOptions(options));
+};
