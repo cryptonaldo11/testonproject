@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, attendanceLogsTable, usersTable, departmentsTable, type AttendanceStatus } from "@workspace/db";
+import { db, attendanceLogsTable, usersTable, departmentsTable, workersTable, type AttendanceStatus } from "@workspace/db";
 import { eq, and, gte, lte, SQL } from "drizzle-orm";
+
 import {
   ListAttendanceQueryParams,
   ListAttendanceResponse,
@@ -18,6 +19,18 @@ import {
   GetAttendanceSummaryResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
+
+const FACE_MATCH_THRESHOLD = 0.6;
+
+function euclideanDistance(a: number[], b: number[]): number {
+  if (a.length !== b.length) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const diff = a[i] - b[i];
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum);
+}
 
 const router: IRouter = Router();
 
@@ -85,6 +98,27 @@ router.post("/attendance/checkin", requireAuth, async (req, res): Promise<void> 
   if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden: can only check in for yourself" });
     return;
+  }
+
+  // Server-side face descriptor validation
+  const [workerRecord] = await db
+    .select({ faceDescriptor: workersTable.faceDescriptor })
+    .from(workersTable)
+    .where(eq(workersTable.userId, parsed.data.userId));
+
+  if (workerRecord?.faceDescriptor) {
+    const submittedDescriptorStr = parsed.data.faceDescriptor;
+    if (!submittedDescriptorStr) {
+      res.status(422).json({ error: "Face verification required: no descriptor submitted" });
+      return;
+    }
+    const submitted = submittedDescriptorStr.split(",").map(Number);
+    const registered = workerRecord.faceDescriptor.split(",").map(Number);
+    const distance = euclideanDistance(submitted, registered);
+    if (distance > FACE_MATCH_THRESHOLD) {
+      res.status(422).json({ error: "Face verification failed: face not recognized" });
+      return;
+    }
   }
 
   const today = new Date().toISOString().slice(0, 10);

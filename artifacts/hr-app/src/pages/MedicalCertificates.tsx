@@ -35,6 +35,10 @@ export default function MedicalCertificates() {
 
   const { uploadFile, isUploading: isFileUploading, progress } = useUpload({
     basePath: "/api/storage",
+    getAuthHeaders: () => {
+      const token = localStorage.getItem("token");
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
     onError: (err) => console.error("Upload error:", err),
   });
 

@@ -16,6 +16,8 @@ interface UploadResponse {
 interface UseUploadOptions {
   /** Base path where object storage routes are mounted (default: "/api/storage") */
   basePath?: string;
+  /** Optional function that returns additional headers (e.g. Authorization) for the request-url endpoint */
+  getAuthHeaders?: () => Record<string, string>;
   onSuccess?: (response: UploadResponse) => void;
   onError?: (error: Error) => void;
 }
@@ -31,6 +33,10 @@ interface UseUploadOptions {
  * ```tsx
  * function FileUploader() {
  *   const { uploadFile, isUploading, error } = useUpload({
+ *     getAuthHeaders: () => {
+ *       const token = localStorage.getItem("token");
+ *       return token ? { Authorization: `Bearer ${token}` } : {};
+ *     },
  *     onSuccess: (response) => {
  *       console.log("Uploaded to:", response.objectPath);
  *     },
@@ -61,10 +67,12 @@ export function useUpload(options: UseUploadOptions = {}) {
 
   const requestUploadUrl = useCallback(
     async (file: File): Promise<UploadResponse> => {
+      const authHeaders = options.getAuthHeaders?.() ?? {};
       const response = await fetch(`${basePath}/uploads/request-url`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...authHeaders,
         },
         body: JSON.stringify({
           name: file.name,
@@ -80,7 +88,7 @@ export function useUpload(options: UseUploadOptions = {}) {
 
       return response.json();
     },
-    []
+    [basePath, options]
   );
 
   const uploadToPresignedUrl = useCallback(
@@ -136,10 +144,12 @@ export function useUpload(options: UseUploadOptions = {}) {
       url: string;
       headers?: Record<string, string>;
     }> => {
+      const authHeaders = options.getAuthHeaders?.() ?? {};
       const response = await fetch(`${basePath}/uploads/request-url`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...authHeaders,
         },
         body: JSON.stringify({
           name: file.name,
@@ -159,7 +169,7 @@ export function useUpload(options: UseUploadOptions = {}) {
         headers: { "Content-Type": file.type || "application/octet-stream" },
       };
     },
-    []
+    [basePath, options]
   );
 
   return {

@@ -147,7 +147,17 @@ export default function CheckIn() {
     { query: { enabled: !!user?.id } }
   );
 
-  const checkInMutation = useCheckIn({ mutation: { onSuccess: () => refetch() } });
+  const [checkInError, setCheckInError] = useState<string | null>(null);
+
+  const checkInMutation = useCheckIn({
+    mutation: {
+      onSuccess: () => { refetch(); setCheckInError(null); },
+      onError: (err) => {
+        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        setCheckInError(msg ?? "Check-in failed. Please try again.");
+      },
+    }
+  });
   const checkOutMutation = useCheckOut({ mutation: { onSuccess: () => refetch() } });
 
   const todayLog = attendanceData?.logs?.[0];
@@ -216,8 +226,12 @@ export default function CheckIn() {
     ? matchScore.toFixed(4)
     : faceDetected ? "0.0000" : "0.0000";
 
+  const faceVerificationRequired = descriptorLoaded && registeredDescriptor !== null;
+  const faceVerificationPassed = !faceVerificationRequired || isFaceMatched;
+
   const handleCheckIn = () => {
     if (!user?.id) return;
+    if (faceVerificationRequired && !isFaceMatched) return;
     checkInMutation.mutate({
       data: {
         userId: user.id,
@@ -332,12 +346,27 @@ export default function CheckIn() {
                 {cameraOn ? "Turn Off Camera" : "Turn On Camera"}
               </Button>
 
+              {checkInError && (
+                <div className="w-full flex items-center gap-2 bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-3 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {checkInError}
+                </div>
+              )}
+
+              {faceVerificationRequired && !faceVerificationPassed && !isCheckedIn && (
+                <div className="w-full flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-800 text-sm px-4 py-3 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  Face verification required. Turn on camera and ensure your face is recognized.
+                </div>
+              )}
+
               <div className="flex gap-4 w-full">
                 <Button
                   size="lg"
                   className="flex-1 text-lg h-16"
-                  disabled={isCheckedIn || checkInMutation.isPending}
+                  disabled={isCheckedIn || checkInMutation.isPending || !faceVerificationPassed}
                   onClick={handleCheckIn}
+                  title={faceVerificationRequired && !faceVerificationPassed ? "Face verification required — enable camera and ensure your face is recognized" : undefined}
                 >
                   <Clock className="w-5 h-5 mr-2" />
                   {isCheckedIn ? "Checked In" : "Check In"}
