@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, leaveApplicationsTable } from "@workspace/db";
+import { db, leaveApplicationsTable, type LeaveType, type LeaveStatus } from "@workspace/db";
 import { eq, and, gte, lte, SQL } from "drizzle-orm";
 import {
   ListLeavesQueryParams,
@@ -14,7 +14,7 @@ import {
   GetLeaveBalanceQueryParams,
   GetLeaveBalanceResponse,
 } from "@workspace/api-zod";
-import { requireAuth, type JWTPayload } from "../lib/auth";
+import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
 
 const ANNUAL_LEAVE_TOTAL = 21;
 const MEDICAL_LEAVE_TOTAL = 14;
@@ -48,20 +48,20 @@ router.get("/leaves", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
   const conditions: SQL[] = [];
 
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
+  if (isRestrictedRole(jwtUser.role)) {
     conditions.push(eq(leaveApplicationsTable.userId, jwtUser.userId));
   } else if (params.data.userId) {
     conditions.push(eq(leaveApplicationsTable.userId, params.data.userId));
   }
 
   if (params.data.status) {
-    conditions.push(eq(leaveApplicationsTable.status, params.data.status as any));
+    conditions.push(eq(leaveApplicationsTable.status, params.data.status as LeaveStatus));
   }
   if (params.data.leaveType) {
-    conditions.push(eq(leaveApplicationsTable.leaveType, params.data.leaveType as any));
+    conditions.push(eq(leaveApplicationsTable.leaveType, params.data.leaveType as LeaveType));
   }
   if (params.data.startDate) {
     conditions.push(gte(leaveApplicationsTable.startDate, params.data.startDate));
@@ -84,13 +84,21 @@ router.post("/leaves", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const jwtUser = req.user!;
+
+  // Workers and drivers can only apply leave for themselves
+  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+    res.status(403).json({ error: "Forbidden: can only apply leave for yourself" });
+    return;
+  }
+
   const start = new Date(parsed.data.startDate);
   const end = new Date(parsed.data.endDate);
   const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
   const [leave] = await db.insert(leaveApplicationsTable).values({
     userId: parsed.data.userId,
-    leaveType: parsed.data.leaveType as any,
+    leaveType: parsed.data.leaveType as LeaveType,
     startDate: parsed.data.startDate,
     endDate: parsed.data.endDate,
     totalDays: String(totalDays),
@@ -105,6 +113,14 @@ router.get("/leaves/balance/:userId", requireAuth, async (req, res): Promise<voi
   const params = GetLeaveBalanceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const jwtUser = req.user!;
+
+  // Workers and drivers can only view their own balance
+  if (isRestrictedRole(jwtUser.role) && params.data.userId !== jwtUser.userId) {
+    res.status(403).json({ error: "Forbidden: can only view your own leave balance" });
     return;
   }
 
@@ -155,8 +171,8 @@ router.get("/leaves/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
-  if ((jwtUser.role === "worker" || jwtUser.role === "driver") && leave.userId !== jwtUser.userId) {
+  const jwtUser = req.user!;
+  if (isRestrictedRole(jwtUser.role) && leave.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -177,7 +193,7 @@ router.patch("/leaves/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
 
   const [existing] = await db.select().from(leaveApplicationsTable).where(eq(leaveApplicationsTable.id, params.data.id));
   if (!existing) {
@@ -185,14 +201,22 @@ router.patch("/leaves/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
-    if (existing.userId !== jwtUser.userId || body.data.status === "approved" || body.data.status === "rejected") {
-      res.status(403).json({ error: "Forbidden" });
+  // Workers/drivers can only cancel their own pending leave; cannot approve or reject
+  if (isRestrictedRole(jwtUser.role)) {
+    if (existing.userId !== jwtUser.userId) {
+      res.status(403).json({ error: "Forbidden: cannot modify another user's leave" });
+      return;
+    }
+    if (body.data.status === "approved" || body.data.status === "rejected") {
+      res.status(403).json({ error: "Forbidden: only HR or admin can approve or reject leave" });
       return;
     }
   }
 
-  const updateData: Record<string, any> = { ...body.data };
+  const updateData: Partial<typeof leaveApplicationsTable.$inferInsert> = {};
+  if (body.data.status) updateData.status = body.data.status as LeaveStatus;
+  if (body.data.reviewNotes) updateData.reviewNotes = body.data.reviewNotes;
+
   if (body.data.status === "approved" || body.data.status === "rejected") {
     updateData.reviewedBy = jwtUser.userId;
     updateData.reviewedAt = new Date();

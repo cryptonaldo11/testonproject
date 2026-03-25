@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, attendanceLogsTable, usersTable, departmentsTable } from "@workspace/db";
+import { db, attendanceLogsTable, usersTable, departmentsTable, type AttendanceStatus } from "@workspace/db";
 import { eq, and, gte, lte, SQL } from "drizzle-orm";
 import {
   ListAttendanceQueryParams,
@@ -17,7 +17,7 @@ import {
   GetAttendanceSummaryQueryParams,
   GetAttendanceSummaryResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole, type JWTPayload } from "../lib/auth";
+import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -45,10 +45,10 @@ router.get("/attendance", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
   const conditions: SQL[] = [];
 
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
+  if (isRestrictedRole(jwtUser.role)) {
     conditions.push(eq(attendanceLogsTable.userId, jwtUser.userId));
   } else if (params.data.userId) {
     conditions.push(eq(attendanceLogsTable.userId, params.data.userId));
@@ -61,7 +61,8 @@ router.get("/attendance", requireAuth, async (req, res): Promise<void> => {
     conditions.push(lte(attendanceLogsTable.date, params.data.endDate));
   }
   if (params.data.status) {
-    conditions.push(eq(attendanceLogsTable.status, params.data.status as any));
+    const status = params.data.status as AttendanceStatus;
+    conditions.push(eq(attendanceLogsTable.status, status));
   }
 
   const logs = await db.select().from(attendanceLogsTable)
@@ -75,6 +76,14 @@ router.post("/attendance/checkin", requireAuth, async (req, res): Promise<void> 
   const parsed = CheckInBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const jwtUser = req.user!;
+
+  // Workers and drivers can only check in for themselves
+  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+    res.status(403).json({ error: "Forbidden: can only check in for yourself" });
     return;
   }
 
@@ -108,6 +117,14 @@ router.post("/attendance/checkout", requireAuth, async (req, res): Promise<void>
   const parsed = CheckOutBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const jwtUser = req.user!;
+
+  // Workers and drivers can only check out for themselves
+  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+    res.status(403).json({ error: "Forbidden: can only check out for yourself" });
     return;
   }
 
@@ -211,8 +228,8 @@ router.get("/attendance/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
-  if ((jwtUser.role === "worker" || jwtUser.role === "driver") && log.userId !== jwtUser.userId) {
+  const jwtUser = req.user!;
+  if (isRestrictedRole(jwtUser.role) && log.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -227,10 +244,12 @@ router.post("/attendance", requireAuth, requireRole("admin", "hr"), async (req, 
     return;
   }
 
+  const status: AttendanceStatus = (parsed.data.status as AttendanceStatus) ?? "present";
+
   const [log] = await db.insert(attendanceLogsTable).values({
     userId: parsed.data.userId,
     date: parsed.data.date,
-    status: (parsed.data.status as any) ?? "present",
+    status,
     checkIn: parsed.data.checkIn ? new Date(parsed.data.checkIn) : null,
     checkOut: parsed.data.checkOut ? new Date(parsed.data.checkOut) : null,
     notes: parsed.data.notes ?? null,
@@ -253,8 +272,8 @@ router.patch("/attendance/:id", requireAuth, requireRole("admin", "hr"), async (
     return;
   }
 
-  const updateData: Record<string, any> = {};
-  if (body.data.status) updateData.status = body.data.status;
+  const updateData: Partial<typeof attendanceLogsTable.$inferInsert> = {};
+  if (body.data.status) updateData.status = body.data.status as AttendanceStatus;
   if (body.data.checkIn) updateData.checkIn = new Date(body.data.checkIn);
   if (body.data.checkOut) updateData.checkOut = new Date(body.data.checkOut);
   if (body.data.notes) updateData.notes = body.data.notes;

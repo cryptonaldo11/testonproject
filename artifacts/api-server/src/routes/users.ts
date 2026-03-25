@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, type UserRole } from "@workspace/db";
 import { eq, and, SQL } from "drizzle-orm";
 import {
   ListUsersQueryParams,
@@ -12,7 +12,7 @@ import {
   UpdateUserResponse,
   DeleteUserParams,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole, hashPassword, type JWTPayload } from "../lib/auth";
+import { requireAuth, requireRole, hashPassword, isRestrictedRole } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -43,7 +43,7 @@ router.get("/users", requireAuth, requireRole("admin", "hr"), async (req, res): 
 
   const conditions: SQL[] = [];
   if (params.data.role) {
-    conditions.push(eq(usersTable.role, params.data.role as any));
+    conditions.push(eq(usersTable.role, params.data.role as UserRole));
   }
   if (params.data.departmentId) {
     conditions.push(eq(usersTable.departmentId, params.data.departmentId));
@@ -65,13 +65,13 @@ router.post("/users", requireAuth, requireRole("admin"), async (req, res): Promi
     return;
   }
 
-  const { password, ...rest } = parsed.data;
+  const { password, role, ...rest } = parsed.data;
   const passwordHash = await hashPassword(password);
 
   const [user] = await db.insert(usersTable).values({
     ...rest,
+    role: role as UserRole,
     passwordHash,
-    role: rest.role as any,
   }).returning();
 
   res.status(201).json(GetUserResponse.parse(mapUser(user)));
@@ -84,12 +84,10 @@ router.get("/users/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
-    if (jwtUser.userId !== params.data.id) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
+  const jwtUser = req.user!;
+  if (isRestrictedRole(jwtUser.role) && jwtUser.userId !== params.data.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
   }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, params.data.id));
@@ -114,10 +112,17 @@ router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res): 
     return;
   }
 
-  const updateData: Record<string, any> = { ...body.data };
-  if (updateData.password) {
-    updateData.passwordHash = await hashPassword(updateData.password);
-    delete updateData.password;
+  const updateData: Partial<typeof usersTable.$inferInsert> = {};
+  if (body.data.name) updateData.name = body.data.name;
+  if (body.data.email) updateData.email = body.data.email;
+  if (body.data.role) updateData.role = body.data.role as UserRole;
+  if (body.data.departmentId !== undefined) updateData.departmentId = body.data.departmentId;
+  if (body.data.phone !== undefined) updateData.phone = body.data.phone;
+  if (body.data.position !== undefined) updateData.position = body.data.position;
+  if (body.data.hourlyRate !== undefined) updateData.hourlyRate = body.data.hourlyRate;
+  if (body.data.isActive !== undefined) updateData.isActive = body.data.isActive;
+  if (body.data.password) {
+    updateData.passwordHash = await hashPassword(body.data.password);
   }
 
   const [user] = await db.update(usersTable)

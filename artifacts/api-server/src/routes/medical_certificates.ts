@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, medicalCertificatesTable } from "@workspace/db";
+import { db, medicalCertificatesTable, type McVerificationStatus } from "@workspace/db";
 import { eq, and, SQL } from "drizzle-orm";
 import {
   ListMedicalCertificatesQueryParams,
@@ -11,7 +11,7 @@ import {
   UpdateMedicalCertificateBody,
   UpdateMedicalCertificateResponse,
 } from "@workspace/api-zod";
-import { requireAuth, type JWTPayload } from "../lib/auth";
+import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -42,17 +42,17 @@ router.get("/medical-certificates", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
   const conditions: SQL[] = [];
 
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
+  if (isRestrictedRole(jwtUser.role)) {
     conditions.push(eq(medicalCertificatesTable.userId, jwtUser.userId));
   } else if (params.data.userId) {
     conditions.push(eq(medicalCertificatesTable.userId, params.data.userId));
   }
 
   if (params.data.verificationStatus) {
-    conditions.push(eq(medicalCertificatesTable.verificationStatus, params.data.verificationStatus as any));
+    conditions.push(eq(medicalCertificatesTable.verificationStatus, params.data.verificationStatus as McVerificationStatus));
   }
 
   const certs = await db.select().from(medicalCertificatesTable)
@@ -65,6 +65,14 @@ router.post("/medical-certificates", requireAuth, async (req, res): Promise<void
   const parsed = CreateMedicalCertificateBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const jwtUser = req.user!;
+
+  // Workers and drivers can only upload MCs for themselves
+  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+    res.status(403).json({ error: "Forbidden: can only upload MC for yourself" });
     return;
   }
 
@@ -98,8 +106,8 @@ router.get("/medical-certificates/:id", requireAuth, async (req, res): Promise<v
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
-  if ((jwtUser.role === "worker" || jwtUser.role === "driver") && cert.userId !== jwtUser.userId) {
+  const jwtUser = req.user!;
+  if (isRestrictedRole(jwtUser.role) && cert.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -107,7 +115,8 @@ router.get("/medical-certificates/:id", requireAuth, async (req, res): Promise<v
   res.json(GetMedicalCertificateResponse.parse(mapCert(cert)));
 });
 
-router.patch("/medical-certificates/:id", requireAuth, async (req, res): Promise<void> => {
+// Only admin and HR can update verification status
+router.patch("/medical-certificates/:id", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
   const params = UpdateMedicalCertificateParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -120,8 +129,14 @@ router.patch("/medical-certificates/:id", requireAuth, async (req, res): Promise
     return;
   }
 
+  const updateData: Partial<typeof medicalCertificatesTable.$inferInsert> = {};
+  if (body.data.verificationStatus) updateData.verificationStatus = body.data.verificationStatus as McVerificationStatus;
+  if (body.data.verificationNotes) updateData.verificationNotes = body.data.verificationNotes;
+  if (body.data.doctorName) updateData.doctorName = body.data.doctorName;
+  if (body.data.clinicName) updateData.clinicName = body.data.clinicName;
+
   const [cert] = await db.update(medicalCertificatesTable)
-    .set(body.data)
+    .set(updateData)
     .where(eq(medicalCertificatesTable.id, params.data.id))
     .returning();
 

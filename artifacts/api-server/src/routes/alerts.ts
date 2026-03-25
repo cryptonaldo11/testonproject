@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, alertsTable } from "@workspace/db";
+import { db, alertsTable, type AlertType, type AlertSeverity, type AlertStatus } from "@workspace/db";
 import { eq, and, SQL } from "drizzle-orm";
 import {
   ListAlertsQueryParams,
@@ -9,7 +9,7 @@ import {
   UpdateAlertBody,
   UpdateAlertResponse,
 } from "@workspace/api-zod";
-import { requireAuth, type JWTPayload } from "../lib/auth";
+import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -37,23 +37,23 @@ router.get("/alerts", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
   const conditions: SQL[] = [];
 
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
+  if (isRestrictedRole(jwtUser.role)) {
     conditions.push(eq(alertsTable.userId, jwtUser.userId));
   } else if (params.data.userId) {
     conditions.push(eq(alertsTable.userId, params.data.userId));
   }
 
   if (params.data.alertType) {
-    conditions.push(eq(alertsTable.alertType, params.data.alertType as any));
+    conditions.push(eq(alertsTable.alertType, params.data.alertType as AlertType));
   }
   if (params.data.status) {
-    conditions.push(eq(alertsTable.status, params.data.status as any));
+    conditions.push(eq(alertsTable.status, params.data.status as AlertStatus));
   }
   if (params.data.severity) {
-    conditions.push(eq(alertsTable.severity, params.data.severity as any));
+    conditions.push(eq(alertsTable.severity, params.data.severity as AlertSeverity));
   }
 
   const alerts = await db.select().from(alertsTable)
@@ -63,7 +63,8 @@ router.get("/alerts", requireAuth, async (req, res): Promise<void> => {
   res.json(ListAlertsResponse.parse({ alerts: alerts.map(mapAlert), total: alerts.length }));
 });
 
-router.post("/alerts", requireAuth, async (req, res): Promise<void> => {
+// Only admin and HR can create alerts
+router.post("/alerts", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
   const parsed = CreateAlertBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -72,8 +73,8 @@ router.post("/alerts", requireAuth, async (req, res): Promise<void> => {
 
   const [alert] = await db.insert(alertsTable).values({
     userId: parsed.data.userId ?? null,
-    alertType: parsed.data.alertType as any,
-    severity: (parsed.data.severity as any) ?? "warning",
+    alertType: parsed.data.alertType as AlertType,
+    severity: (parsed.data.severity as AlertSeverity) ?? "warning",
     title: parsed.data.title,
     message: parsed.data.message,
     relatedDate: parsed.data.relatedDate ?? null,
@@ -96,8 +97,28 @@ router.patch("/alerts/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
-  const updateData: Record<string, any> = { ...body.data };
+  const jwtUser = req.user!;
+
+  const [existing] = await db.select().from(alertsTable).where(eq(alertsTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Alert not found" });
+    return;
+  }
+
+  // Workers/drivers can only update alerts assigned to themselves, and cannot resolve
+  if (isRestrictedRole(jwtUser.role)) {
+    if (existing.userId !== jwtUser.userId) {
+      res.status(403).json({ error: "Forbidden: cannot modify another user's alert" });
+      return;
+    }
+    if (body.data.status === "resolved") {
+      res.status(403).json({ error: "Forbidden: only HR or admin can resolve alerts" });
+      return;
+    }
+  }
+
+  const updateData: Partial<typeof alertsTable.$inferInsert> = {};
+  if (body.data.status) updateData.status = body.data.status as AlertStatus;
 
   if (body.data.status === "resolved") {
     updateData.resolvedBy = jwtUser.userId;

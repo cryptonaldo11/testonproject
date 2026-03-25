@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { LoginBody, GetMeResponse } from "@workspace/api-zod";
-import { signToken, comparePassword, requireAuth, type JWTPayload } from "../lib/auth";
+import { signToken, comparePassword, requireAuth } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -59,7 +59,7 @@ router.post("/auth/logout", (_req, res): void => {
 });
 
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, jwtUser.userId));
 
   if (!user) {

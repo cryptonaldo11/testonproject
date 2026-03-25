@@ -1,22 +1,34 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { Request, Response, NextFunction } from "express";
+import type { UserRole } from "@workspace/db";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "teston-hr-secret-2024-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
 
 export interface JWTPayload {
   userId: number;
   email: string;
-  role: string;
+  role: UserRole;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JWTPayload;
+    }
+  }
 }
 
 export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(payload, JWT_SECRET!, { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, JWT_SECRET!) as JWTPayload;
   } catch {
     return null;
   }
@@ -42,13 +54,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     res.status(401).json({ error: "Invalid or expired token" });
     return;
   }
-  (req as any).user = payload;
+  req.user = payload;
   next();
 }
 
-export function requireRole(...roles: string[]) {
+export function requireRole(...roles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const user = (req as any).user as JWTPayload | undefined;
+    const user = req.user;
     if (!user) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -59,4 +71,8 @@ export function requireRole(...roles: string[]) {
     }
     next();
   };
+}
+
+export function isRestrictedRole(role: UserRole): boolean {
+  return role === "worker" || role === "driver";
 }

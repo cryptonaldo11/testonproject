@@ -7,7 +7,7 @@ import {
   GetUserProductivityParams,
   GetUserProductivityResponse,
 } from "@workspace/api-zod";
-import { requireAuth, type JWTPayload } from "../lib/auth";
+import { requireAuth, isRestrictedRole } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -34,10 +34,10 @@ router.get("/productivity", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
+  const jwtUser = req.user!;
   const conditions: SQL[] = [];
 
-  if (jwtUser.role === "worker" || jwtUser.role === "driver") {
+  if (isRestrictedRole(jwtUser.role)) {
     conditions.push(eq(productivityScoresTable.userId, jwtUser.userId));
   } else if (params.data.userId) {
     conditions.push(eq(productivityScoresTable.userId, params.data.userId));
@@ -63,8 +63,8 @@ router.get("/productivity/:userId", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const jwtUser = (req as any).user as JWTPayload;
-  if ((jwtUser.role === "worker" || jwtUser.role === "driver") && jwtUser.userId !== params.data.userId) {
+  const jwtUser = req.user!;
+  if (isRestrictedRole(jwtUser.role) && jwtUser.userId !== params.data.userId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
