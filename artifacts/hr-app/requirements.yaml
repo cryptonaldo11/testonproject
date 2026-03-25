@@ -1,0 +1,18 @@
+packages:
+  "framer-motion": "For page transitions and polished UI animations"
+  "recharts": "For dashboard and productivity charts"
+  "date-fns": "For readable date formatting"
+  "react-hook-form": "For robust form state management"
+  "@hookform/resolvers": "For Zod validation integration with react-hook-form"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging tailwind classes without style conflicts"
+  "jwt-decode": "For parsing JWT tokens"
+
+images:
+  - path: "artifacts/hr-app/public/images/login-bg.png"
+    description: "Professional corporate landscape architecture background, modern eco-friendly office building with lush green vertical gardens, soft morning sunlight, clean minimal aesthetic, deep greens and bright whites"
+    aspect_ratio: "16:9"
+
+notes:
+  - Intercepting global fetch to append JWT Bearer token from localStorage for all API calls
+  - Using generated hooks from @workspace/api-client-react

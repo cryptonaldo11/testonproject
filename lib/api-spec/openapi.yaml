@@ -3,13 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Teston HR Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: departments
+    description: Department management
+  - name: attendance
+    description: Attendance tracking
+  - name: leaves
+    description: Leave management
+  - name: medical-certificates
+    description: Medical certificate management
+  - name: alerts
+    description: Alert management
+  - name: productivity
+    description: Productivity scoring
 paths:
   /healthz:
     get:
@@ -24,6 +40,767 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users
+      parameters:
+        - in: query
+          name: role
+          schema:
+            type: string
+        - in: query
+          name: departmentId
+          schema:
+            type: number
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /departments:
+    get:
+      operationId: listDepartments
+      tags: [departments]
+      summary: List all departments
+      responses:
+        "200":
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentListResponse"
+    post:
+      operationId: createDepartment
+      tags: [departments]
+      summary: Create a department
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepartmentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentResponse"
+
+  /departments/{id}:
+    get:
+      operationId: getDepartment
+      tags: [departments]
+      summary: Get a department
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Department
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateDepartment
+      tags: [departments]
+      summary: Update a department
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDepartmentRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentResponse"
+
+  /attendance:
+    get:
+      operationId: listAttendance
+      tags: [attendance]
+      summary: List attendance logs
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: startDate
+          schema:
+            type: string
+        - in: query
+          name: endDate
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceListResponse"
+    post:
+      operationId: createAttendance
+      tags: [attendance]
+      summary: Create attendance record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAttendanceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
+
+  /attendance/{id}:
+    get:
+      operationId: getAttendance
+      tags: [attendance]
+      summary: Get an attendance record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Attendance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateAttendance
+      tags: [attendance]
+      summary: Update attendance record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAttendanceRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
+
+  /attendance/checkin:
+    post:
+      operationId: checkIn
+      tags: [attendance]
+      summary: Check in with face data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInRequest"
+      responses:
+        "200":
+          description: Checked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
+        "400":
+          description: Already checked in or error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /attendance/checkout:
+    post:
+      operationId: checkOut
+      tags: [attendance]
+      summary: Check out
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckOutRequest"
+      responses:
+        "200":
+          description: Checked out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
+        "400":
+          description: Not checked in or error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /attendance/summary:
+    get:
+      operationId: getAttendanceSummary
+      tags: [attendance]
+      summary: Get man-hours and cost summary
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+        - in: query
+          name: endDate
+          schema:
+            type: string
+        - in: query
+          name: departmentId
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Attendance summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceSummaryResponse"
+
+  /leaves:
+    get:
+      operationId: listLeaves
+      tags: [leaves]
+      summary: List leave applications
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: leaveType
+          schema:
+            type: string
+        - in: query
+          name: startDate
+          schema:
+            type: string
+        - in: query
+          name: endDate
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Leave applications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveListResponse"
+    post:
+      operationId: createLeave
+      tags: [leaves]
+      summary: Submit a leave application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeaveRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /leaves/{id}:
+    get:
+      operationId: getLeave
+      tags: [leaves]
+      summary: Get a leave application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Leave application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateLeave
+      tags: [leaves]
+      summary: Review/update a leave application
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaveRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveResponse"
+
+  /leaves/balance/{userId}:
+    get:
+      operationId: getLeaveBalance
+      tags: [leaves]
+      summary: Get leave balance for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: year
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Leave balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveBalanceResponse"
+
+  /medical-certificates:
+    get:
+      operationId: listMedicalCertificates
+      tags: [medical-certificates]
+      summary: List medical certificates
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: verificationStatus
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Medical certificates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalCertificateListResponse"
+    post:
+      operationId: createMedicalCertificate
+      tags: [medical-certificates]
+      summary: Upload a medical certificate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMedicalCertificateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalCertificateResponse"
+
+  /medical-certificates/{id}:
+    get:
+      operationId: getMedicalCertificate
+      tags: [medical-certificates]
+      summary: Get a medical certificate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Medical certificate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalCertificateResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateMedicalCertificate
+      tags: [medical-certificates]
+      summary: Update a medical certificate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMedicalCertificateRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalCertificateResponse"
+
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List alerts
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: alertType
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: severity
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertListResponse"
+    post:
+      operationId: createAlert
+      tags: [alerts]
+      summary: Create an alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAlertRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertResponse"
+
+  /alerts/{id}:
+    patch:
+      operationId: updateAlert
+      tags: [alerts]
+      summary: Update alert status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAlertRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertResponse"
+
+  /productivity:
+    get:
+      operationId: listProductivityScores
+      tags: [productivity]
+      summary: List productivity scores
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: month
+          schema:
+            type: string
+        - in: query
+          name: year
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Productivity scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductivityListResponse"
+
+  /productivity/{userId}:
+    get:
+      operationId: getUserProductivity
+      tags: [productivity]
+      summary: Get productivity for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Productivity scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductivityListResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +811,771 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserResponse"
+      required:
+        - token
+        - user
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        employeeId:
+          type: string
+          nullable: true
+        departmentId:
+          type: number
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        position:
+          type: string
+          nullable: true
+        hourlyRate:
+          type: string
+        isActive:
+          type: string
+        hasFaceRegistered:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - role
+        - hourlyRate
+        - isActive
+        - hasFaceRegistered
+        - createdAt
+        - updatedAt
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        total:
+          type: number
+      required:
+        - users
+        - total
+
+    CreateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, hr, driver, worker]
+        employeeId:
+          type: string
+        departmentId:
+          type: number
+        phone:
+          type: string
+        position:
+          type: string
+        hourlyRate:
+          type: string
+      required:
+        - name
+        - email
+        - password
+        - role
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, hr, driver, worker]
+        employeeId:
+          type: string
+        departmentId:
+          type: number
+        phone:
+          type: string
+        position:
+          type: string
+        hourlyRate:
+          type: string
+        isActive:
+          type: string
+        faceDescriptor:
+          type: string
+        password:
+          type: string
+
+    DepartmentResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    DepartmentListResponse:
+      type: object
+      properties:
+        departments:
+          type: array
+          items:
+            $ref: "#/components/schemas/DepartmentResponse"
+        total:
+          type: number
+      required:
+        - departments
+        - total
+
+    CreateDepartmentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+
+    UpdateDepartmentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    AttendanceResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+        checkIn:
+          type: string
+          format: date-time
+          nullable: true
+        checkOut:
+          type: string
+          format: date-time
+          nullable: true
+        date:
+          type: string
+        status:
+          type: string
+        hoursWorked:
+          type: string
+          nullable: true
+        faceMatchScore:
+          type: string
+          nullable: true
+        isManualEntry:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - date
+        - status
+        - isManualEntry
+        - createdAt
+        - updatedAt
+
+    AttendanceListResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttendanceResponse"
+        total:
+          type: number
+      required:
+        - logs
+        - total
+
+    CreateAttendanceRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+        date:
+          type: string
+        status:
+          type: string
+          enum: [present, absent, late, half_day]
+        checkIn:
+          type: string
+        checkOut:
+          type: string
+        notes:
+          type: string
+        isManualEntry:
+          type: string
+      required:
+        - userId
+        - date
+
+    UpdateAttendanceRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [present, absent, late, half_day]
+        checkIn:
+          type: string
+        checkOut:
+          type: string
+        notes:
+          type: string
+        hoursWorked:
+          type: string
+
+    CheckInRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+        faceDescriptor:
+          type: string
+          nullable: true
+        faceMatchScore:
+          type: string
+          nullable: true
+      required:
+        - userId
+
+    CheckOutRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+      required:
+        - userId
+
+    AttendanceSummaryItem:
+      type: object
+      properties:
+        userId:
+          type: number
+        userName:
+          type: string
+        employeeId:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+        totalDays:
+          type: number
+        presentDays:
+          type: number
+        absentDays:
+          type: number
+        lateDays:
+          type: number
+        totalHours:
+          type: string
+        totalCost:
+          type: string
+        hourlyRate:
+          type: string
+      required:
+        - userId
+        - userName
+        - totalDays
+        - presentDays
+        - absentDays
+        - lateDays
+        - totalHours
+        - totalCost
+        - hourlyRate
+
+    AttendanceSummaryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttendanceSummaryItem"
+        startDate:
+          type: string
+        endDate:
+          type: string
+        totalManHours:
+          type: string
+        totalCost:
+          type: string
+      required:
+        - items
+        - startDate
+        - endDate
+        - totalManHours
+        - totalCost
+
+    LeaveResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+        leaveType:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        totalDays:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+        reviewedBy:
+          type: number
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewNotes:
+          type: string
+          nullable: true
+        aiClassification:
+          type: string
+          nullable: true
+        aiConfidence:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - leaveType
+        - startDate
+        - endDate
+        - totalDays
+        - reason
+        - status
+        - createdAt
+        - updatedAt
+
+    LeaveListResponse:
+      type: object
+      properties:
+        leaves:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaveResponse"
+        total:
+          type: number
+      required:
+        - leaves
+        - total
+
+    CreateLeaveRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+        leaveType:
+          type: string
+          enum: [annual, medical, emergency, unpaid, other]
+        startDate:
+          type: string
+        endDate:
+          type: string
+        reason:
+          type: string
+      required:
+        - userId
+        - leaveType
+        - startDate
+        - endDate
+        - reason
+
+    UpdateLeaveRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled]
+        reviewNotes:
+          type: string
+        leaveType:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        reason:
+          type: string
+
+    LeaveBalanceResponse:
+      type: object
+      properties:
+        userId:
+          type: number
+        year:
+          type: number
+        annualLeaveUsed:
+          type: number
+        annualLeaveTotal:
+          type: number
+        annualLeaveRemaining:
+          type: number
+        medicalLeaveUsed:
+          type: number
+        medicalLeaveTotal:
+          type: number
+        medicalLeaveRemaining:
+          type: number
+      required:
+        - userId
+        - year
+        - annualLeaveUsed
+        - annualLeaveTotal
+        - annualLeaveRemaining
+        - medicalLeaveUsed
+        - medicalLeaveTotal
+        - medicalLeaveRemaining
+
+    MedicalCertificateResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+        leaveApplicationId:
+          type: number
+          nullable: true
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+        fileType:
+          type: string
+        doctorName:
+          type: string
+          nullable: true
+        clinicName:
+          type: string
+          nullable: true
+        issueDate:
+          type: string
+          nullable: true
+        mcStartDate:
+          type: string
+          nullable: true
+        mcEndDate:
+          type: string
+          nullable: true
+        verificationStatus:
+          type: string
+        verificationNotes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - fileName
+        - fileUrl
+        - fileType
+        - verificationStatus
+        - createdAt
+        - updatedAt
+
+    MedicalCertificateListResponse:
+      type: object
+      properties:
+        certificates:
+          type: array
+          items:
+            $ref: "#/components/schemas/MedicalCertificateResponse"
+        total:
+          type: number
+      required:
+        - certificates
+        - total
+
+    CreateMedicalCertificateRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+        leaveApplicationId:
+          type: number
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+        fileType:
+          type: string
+        doctorName:
+          type: string
+        clinicName:
+          type: string
+        issueDate:
+          type: string
+        mcStartDate:
+          type: string
+        mcEndDate:
+          type: string
+      required:
+        - userId
+        - fileName
+        - fileUrl
+        - fileType
+
+    UpdateMedicalCertificateRequest:
+      type: object
+      properties:
+        doctorName:
+          type: string
+        clinicName:
+          type: string
+        issueDate:
+          type: string
+        mcStartDate:
+          type: string
+        mcEndDate:
+          type: string
+        verificationStatus:
+          type: string
+          enum: [pending, verified, suspicious, unreadable]
+        verificationNotes:
+          type: string
+        leaveApplicationId:
+          type: number
+
+    AlertResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+          nullable: true
+        alertType:
+          type: string
+        severity:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+        relatedDate:
+          type: string
+          nullable: true
+        resolvedBy:
+          type: number
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - alertType
+        - severity
+        - title
+        - message
+        - status
+        - createdAt
+        - updatedAt
+
+    AlertListResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertResponse"
+        total:
+          type: number
+      required:
+        - alerts
+        - total
+
+    CreateAlertRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+        alertType:
+          type: string
+          enum: [missing_attendance, missing_document, frequent_absence, policy_violation, ghost_worker, leave_limit_exceeded]
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        title:
+          type: string
+        message:
+          type: string
+        relatedDate:
+          type: string
+      required:
+        - alertType
+        - title
+        - message
+
+    UpdateAlertRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, resolved, dismissed]
+
+    ProductivityScoreResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+        score:
+          type: string
+        attendanceRate:
+          type: string
+        punctualityRate:
+          type: string
+        leaveFrequency:
+          type: string
+        month:
+          type: string
+        year:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - score
+        - attendanceRate
+        - punctualityRate
+        - leaveFrequency
+        - month
+        - year
+        - createdAt
+        - updatedAt
+
+    ProductivityListResponse:
+      type: object
+      properties:
+        scores:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductivityScoreResponse"
+        total:
+          type: number
+      required:
+        - scores
+        - total
