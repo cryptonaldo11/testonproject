@@ -1,0 +1,56 @@
+Milestone 2: AI Features Implementation
+Key Features:
+Facial Recognition Attendance Tracking: Use facial recognition to monitor worker attendance in real time.
+AI-based Absence Classification: Automatically classify absences as Medical, Leave, or Other, based on predefined policies.
+Leave Policy Enforcement:
+14-day Medical Leave Policy: Ensure compliance with the 14-day medical leave policy.
+21-day Annual Leave Policy: Enforce the 21-day annual leave policy.
+AI-Verified Document Upload: Implement AI verification for medical certificates or other leave-related documents.
+Ghost Worker Detection & Attendance Anomalies: Use AI to detect ghost workers (non-existent workers marked present) and notify admins of attendance anomalies.
+Worker Productivity Scoring: Implement a system to score worker productivity based on attendance, leave, and other performance metrics.
+Cost: $45,000
+Milestone 3: AI Alerts Integration
+Key Features:
+Alerts for Missing Attendance/Document: Send alerts for missing attendance logs or missing documents (such as medical certificates).
+Frequent Absence Alerts: Notify HR of workers with frequent absences.
+Configurable Thresholds for HR Policy Enforcement: Allow HR to set thresholds for various policies (e.g., maximum allowable absences) and trigger alerts when thresholds are exceeded.
+Cost: $12,000
+Milestone 4: AI Attendance and Insights
+Key Features:
+Worker Attendance Summaries: Generate comprehensive attendance summaries for workers.
+Leave Statistics: Track and report on the number of leave days used by each worker.
+AI-Generated Workforce Efficiency Insights: Provide HR with insights into workforce efficiency based on attendance patterns, leave usage, and productivity scores.
+Cost: Included in the cost of AI Features and AI Alerts
+Total Project Cost: $87,000
+Role-Based Access Control (RBAC):
+
+1. Admin Access:
+
+Full access to all system features, including HR Module, AI Features, AI Alerts, and AI Attendance.
+Ability to configure AI-driven policies, manage reports, and review productivity scores.
+
+2. Human Resource (HR) Access:
+
+Manage leave applications, upload medical leave records, and track attendance.
+Access and configure AI alerts and workforce summaries, but limited configuration of AI-based features.
+Can review man-hour & cost summaries, leave statistics, and productivity scores.
+
+3. Driver Access:
+
+View personal attendance logs and submit leave applications.
+Have attendance tracked via facial recognition, with absence classification provided (Medical, Leave, Other).
+Receive alerts for missing attendance or leave-related documents.
+View personal attendance summaries and leave statistics.
+
+4. Worker Access:
+
+View personal attendance and submit leave applications.
+Attendance will be tracked via facial recognition, and absences will be classified as Medical, Leave, or Other.
+Receive alerts for missing attendance or documents.
+View personal attendance summaries and leave statistics.
+Summary of Deliverables:
+A fully functional HR management system with facial recognition for attendance.
+AI-based absence classification and leave policy enforcement.
+Alerts for attendance anomalies, missing documents, and frequent absences.
+Real-time workforce efficiency insights and productivity scoring.
+Role-based access control to ensure appropriate permissions for each user group.
