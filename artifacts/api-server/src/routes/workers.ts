@@ -149,6 +149,25 @@ router.patch("/workers/:id", requireAuth, requireRole("admin", "hr"), async (req
   res.json(mapWorker(worker));
 });
 
+/**
+ * GET /workers/me/face-descriptor
+ * Returns the logged-in worker's registered face descriptor (their own only).
+ * Used by the check-in page for client-side face matching.
+ */
+router.get("/workers/me/face-descriptor", requireAuth, async (req, res): Promise<void> => {
+  const jwtUser = req.user!;
+  const [worker] = await db.select().from(workersTable).where(eq(workersTable.userId, jwtUser.userId));
+  if (!worker) {
+    res.status(404).json({ error: "Worker profile not found" });
+    return;
+  }
+  if (!worker.faceDescriptor) {
+    res.json({ registered: false, descriptor: null });
+    return;
+  }
+  res.json({ registered: true, descriptor: worker.faceDescriptor });
+});
+
 router.post("/workers/:workerId/face", requireAuth, requireRole(["admin", "hr"]), async (req, res) => {
   const params = RegisterFaceParams.safeParse(req.params);
   if (!params.success) {

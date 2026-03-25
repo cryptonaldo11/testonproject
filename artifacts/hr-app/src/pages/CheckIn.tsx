@@ -7,15 +7,40 @@ import { Clock, MapPin, CheckCircle2, Camera, CameraOff, AlertCircle } from "luc
 import { formatDateTime } from "@/lib/utils";
 
 const FACE_DETECT_MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
+const FACE_MATCH_THRESHOLD = 0.6;
 
 type FaceApiModule = typeof import("face-api.js");
 
-function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+function euclideanDistance(a: number[], b: number[]): number {
+  if (a.length !== b.length) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const diff = a[i] - b[i];
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum);
+}
+
+interface FaceDetectionResult {
+  modelsLoaded: boolean;
+  faceDetected: boolean;
+  faceDescriptor: string | null;
+  matchScore: number | null;
+  startDetection: (registeredDescriptor: number[] | null) => void;
+  stopDetection: () => void;
+}
+
+function useFaceDetection(
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  canvasRef: React.RefObject<HTMLCanvasElement | null>
+): FaceDetectionResult {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceDescriptor, setFaceDescriptor] = useState<string | null>(null);
+  const [matchScore, setMatchScore] = useState<number | null>(null);
   const faceApiRef = useRef<FaceApiModule | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const registeredDescriptorRef = useRef<number[] | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -37,9 +62,11 @@ function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement | null>, ca
     return () => { mounted = false; };
   }, []);
 
-  const startDetection = useCallback(() => {
+  const startDetection = useCallback((registeredDescriptor: number[] | null) => {
     const faceapi = faceApiRef.current;
     if (!faceapi || !modelsLoaded) return;
+
+    registeredDescriptorRef.current = registeredDescriptor;
 
     intervalRef.current = setInterval(async () => {
       const video = videoRef.current;
@@ -60,13 +87,24 @@ function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement | null>, ca
           if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
           faceapi.draw.drawDetections(canvas, [resized]);
           faceapi.draw.drawFaceLandmarks(canvas, [resized]);
+
+          const currentDescriptor = Array.from(detection.descriptor);
           setFaceDetected(true);
-          setFaceDescriptor(Array.from(detection.descriptor).join(","));
+          setFaceDescriptor(currentDescriptor.join(","));
+
+          if (registeredDescriptorRef.current) {
+            const distance = euclideanDistance(currentDescriptor, registeredDescriptorRef.current);
+            const score = Math.max(0, 1 - distance / FACE_MATCH_THRESHOLD);
+            setMatchScore(parseFloat(score.toFixed(4)));
+          } else {
+            setMatchScore(null);
+          }
         } else {
           const ctx = canvas.getContext("2d");
           if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
           setFaceDetected(false);
           setFaceDescriptor(null);
+          setMatchScore(null);
         }
       } catch {
         // Ignore detection errors
@@ -81,7 +119,7 @@ function useFaceDetection(videoRef: React.RefObject<HTMLVideoElement | null>, ca
     }
   }, []);
 
-  return { modelsLoaded, faceDetected, faceDescriptor, startDetection, stopDetection };
+  return { modelsLoaded, faceDetected, faceDescriptor, matchScore, startDetection, stopDetection };
 }
 
 export default function CheckIn() {
@@ -89,11 +127,13 @@ export default function CheckIn() {
   const [time, setTime] = useState(new Date());
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [registeredDescriptor, setRegisteredDescriptor] = useState<number[] | null>(null);
+  const [descriptorLoaded, setDescriptorLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const { modelsLoaded, faceDetected, faceDescriptor, startDetection, stopDetection } = useFaceDetection(videoRef, canvasRef);
+  const { modelsLoaded, faceDetected, faceDescriptor, matchScore, startDetection, stopDetection } = useFaceDetection(videoRef, canvasRef);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -114,6 +154,30 @@ export default function CheckIn() {
   const isCheckedIn = !!todayLog?.checkIn;
   const isCheckedOut = !!todayLog?.checkOut;
 
+  useEffect(() => {
+    if (!user?.id) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch("/api/workers/me/face-descriptor", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then((data: { registered: boolean; descriptor: string | null }) => {
+        if (data.registered && data.descriptor) {
+          const nums = data.descriptor.split(",").map(Number);
+          setRegisteredDescriptor(nums);
+        }
+        setDescriptorLoaded(true);
+      })
+      .catch(() => setDescriptorLoaded(true));
+  }, [user?.id]);
+
+  const isFaceMatched = faceDetected && registeredDescriptor !== null && matchScore !== null && matchScore > 0;
+  const faceMatchDistance = faceDetected && registeredDescriptor !== null && matchScore !== null
+    ? parseFloat((FACE_MATCH_THRESHOLD * (1 - matchScore)).toFixed(4))
+    : null;
+
   const startCamera = useCallback(async () => {
     setCameraError(null);
     try {
@@ -123,14 +187,14 @@ export default function CheckIn() {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play();
-          startDetection();
+          startDetection(registeredDescriptor);
         };
       }
       setCameraOn(true);
-    } catch (err) {
+    } catch {
       setCameraError("Camera access denied. Please allow camera permissions.");
     }
-  }, [startDetection]);
+  }, [startDetection, registeredDescriptor]);
 
   const stopCamera = useCallback(() => {
     stopDetection();
@@ -148,13 +212,17 @@ export default function CheckIn() {
 
   useEffect(() => { return () => stopCamera(); }, [stopCamera]);
 
+  const faceMatchScoreStr = matchScore !== null
+    ? matchScore.toFixed(4)
+    : faceDetected ? "0.0000" : "0.0000";
+
   const handleCheckIn = () => {
     if (!user?.id) return;
     checkInMutation.mutate({
       data: {
         userId: user.id,
         faceDescriptor: faceDescriptor ?? undefined,
-        faceMatchScore: faceDetected ? "0.98" : "0.00",
+        faceMatchScore: faceMatchScoreStr,
       }
     });
   };
@@ -162,6 +230,53 @@ export default function CheckIn() {
   const handleCheckOut = () => {
     if (!user?.id) return;
     checkOutMutation.mutate({ data: { userId: user.id } });
+  };
+
+  const getFaceStatusBanner = () => {
+    if (!modelsLoaded) {
+      return (
+        <div className="absolute bottom-2 left-2 right-2 bg-primary/80 text-white text-xs px-3 py-1.5 rounded-lg font-medium text-center">
+          Loading face models...
+        </div>
+      );
+    }
+    if (!faceDetected) {
+      return (
+        <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-orange-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          No face detected
+        </div>
+      );
+    }
+    if (!descriptorLoaded) {
+      return (
+        <div className="absolute bottom-2 left-2 right-2 bg-primary/80 text-white text-xs px-3 py-1.5 rounded-lg font-medium text-center">
+          Checking registration...
+        </div>
+      );
+    }
+    if (!registeredDescriptor) {
+      return (
+        <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-yellow-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          Face detected (not registered)
+        </div>
+      );
+    }
+    if (isFaceMatched) {
+      return (
+        <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-green-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          Face matched ({(matchScore! * 100).toFixed(1)}%)
+        </div>
+      );
+    }
+    return (
+      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+        Face not recognized (distance: {faceMatchDistance?.toFixed(3)})
+      </div>
+    );
   };
 
   return (
@@ -194,23 +309,7 @@ export default function CheckIn() {
                       ref={canvasRef}
                       className="absolute inset-0 w-full h-full"
                     />
-                    {faceDetected && (
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-green-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        Face detected {!modelsLoaded && "(loading models...)"}
-                      </div>
-                    )}
-                    {!faceDetected && modelsLoaded && (
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-orange-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        No face detected
-                      </div>
-                    )}
-                    {!modelsLoaded && !faceDetected && (
-                      <div className="absolute bottom-2 left-2 right-2 bg-primary/80 text-white text-xs px-3 py-1.5 rounded-lg font-medium text-center">
-                        Loading face models...
-                      </div>
-                    )}
+                    {getFaceStatusBanner()}
                   </>
                 ) : (
                   <div className="flex flex-col items-center gap-3 p-6 text-center">
@@ -271,6 +370,9 @@ export default function CheckIn() {
                         <span className="font-semibold text-sm">Check In</span>
                         <span className="text-xs text-muted-foreground font-mono">{isCheckedIn ? formatDateTime(todayLog?.checkIn) : '--:--'}</span>
                       </div>
+                      {todayLog?.faceMatchScore && (
+                        <p className="text-xs text-muted-foreground mt-1">Match score: {parseFloat(todayLog.faceMatchScore).toFixed(2)}</p>
+                      )}
                     </div>
                   </div>
 

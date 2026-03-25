@@ -5,7 +5,9 @@ import {
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, isRestrictedRole } from "../lib/auth";
+import { db, medicalCertificatesTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -81,14 +83,33 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
  * GET /storage/objects/*
  *
  * Serve object entities from PRIVATE_OBJECT_DIR.
- * Requires authentication — private documents (e.g. medical certificates) must not
- * be accessible without a valid JWT.
+ * Requires authentication. Restricted roles (worker/driver) may only download
+ * objects that belong to their own medical certificate records.
+ * Admins and HR can download any object.
  */
 router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
+    const jwtUser = req.user!;
+
+    if (isRestrictedRole(jwtUser.role)) {
+      const [cert] = await db
+        .select({ userId: medicalCertificatesTable.userId })
+        .from(medicalCertificatesTable)
+        .where(eq(medicalCertificatesTable.fileUrl, objectPath));
+
+      if (!cert) {
+        res.status(404).json({ error: "Object not found" });
+        return;
+      }
+      if (cert.userId !== jwtUser.userId) {
+        res.status(403).json({ error: "Forbidden: you may only access your own documents" });
+        return;
+      }
+    }
+
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
     const response = await objectStorageService.downloadObject(objectFile);
 
