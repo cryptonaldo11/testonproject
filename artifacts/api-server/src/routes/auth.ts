@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { LoginBody, GetMeResponse } from "@workspace/api-zod";
-import { signToken, comparePassword, requireAuth } from "../lib/auth";
+import { signToken, comparePassword, requireAuth, type JWTPayload } from "../lib/auth";
 
 const router: IRouter = Router();
 
