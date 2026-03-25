@@ -187,7 +187,7 @@ export default function MedicalCertificates() {
               <div className="flex justify-between"><span className="text-muted-foreground">Doctor:</span> <span className="font-medium">{mc.doctorName || '-'}</span></div>
               <div className="pt-4 mt-4 border-t flex justify-end">
                 <Button variant="outline" size="sm" asChild>
-                  <a href={`/api/storage/objects${mc.fileUrl}`} target="_blank" rel="noopener noreferrer">
+                  <a href={`/api/storage${mc.fileUrl}`} target="_blank" rel="noopener noreferrer">
                     View Document
                   </a>
                 </Button>

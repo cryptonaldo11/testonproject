@@ -1,14 +1,10 @@
 import React, { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useGetAttendanceSummary } from "@workspace/api-client-react";
+import { useGetAttendanceSummary, type AttendanceSummaryResponse } from "@workspace/api-client-react";
 import { Card, Input } from "@/components/ui/core";
 import { FileDown, DollarSign, Clock } from "lucide-react";
 
-function exportToCsv(data: {
-  items: { userId: number; userName: string; presentDays: number; totalHours: string; hourlyRate: string; totalCost: string }[];
-  totalManHours: string;
-  totalCost: string;
-}, startDate: string, endDate: string) {
+function exportToCsv(data: AttendanceSummaryResponse, startDate: string, endDate: string) {
   const headers = ["Employee", "User ID", "Days Worked", "Total Hours", "Hourly Rate (SGD)", "Total Cost (SGD)"];
   const rows = data.items.map(item => [
     `"${item.userName}"`,
@@ -50,7 +46,7 @@ export default function ManHours() {
 
   const handleExport = () => {
     if (!summaryData?.items?.length) return;
-    exportToCsv(summaryData as any, startDate, endDate);
+    exportToCsv(summaryData, startDate, endDate);
   };
 
   return (
