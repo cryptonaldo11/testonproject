@@ -160,18 +160,22 @@ export class ObjectStorageService {
     }
 
     const url = new URL(rawPath);
+    // url.pathname has a leading '/' followed by the bucket name + object path,
+    // e.g. '/bucket-name/private/uploads/uuid'
     const rawObjectPath = url.pathname;
 
     let objectEntityDir = this.getPrivateObjectDir();
     if (!objectEntityDir.endsWith("/")) {
       objectEntityDir = `${objectEntityDir}/`;
     }
+    // rawObjectPath starts with '/', objectEntityDir does not — prefix with '/' to match
+    const prefixedEntityDir = `/${objectEntityDir}`;
 
-    if (!rawObjectPath.startsWith(objectEntityDir)) {
+    if (!rawObjectPath.startsWith(prefixedEntityDir)) {
       return rawObjectPath;
     }
 
-    const entityId = rawObjectPath.slice(objectEntityDir.length);
+    const entityId = rawObjectPath.slice(prefixedEntityDir.length);
     return `/objects/${entityId}`;
   }
 
