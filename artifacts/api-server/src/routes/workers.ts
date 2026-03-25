@@ -3,6 +3,7 @@ import { db, workersTable, insertWorkerSchema, type WorkerStatus } from "@worksp
 import { eq, and, SQL } from "drizzle-orm";
 import { z } from "zod/v4";
 import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
+import { RegisterFaceBody, RegisterFaceParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -138,6 +139,54 @@ router.patch("/workers/:id", requireAuth, requireRole("admin", "hr"), async (req
   const [worker] = await db.update(workersTable)
     .set(updateData)
     .where(eq(workersTable.id, id))
+    .returning();
+
+  if (!worker) {
+    res.status(404).json({ error: "Worker not found" });
+    return;
+  }
+
+  res.json(mapWorker(worker));
+});
+
+router.post("/workers/:workerId/face", requireAuth, requireRole(["admin", "hr"]), async (req, res) => {
+  const params = RegisterFaceParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid workerId" });
+    return;
+  }
+
+  const body = RegisterFaceBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid request body" });
+    return;
+  }
+
+  const [worker] = await db
+    .update(workersTable)
+    .set({ faceDescriptor: body.data.faceDescriptor })
+    .where(eq(workersTable.id, params.data.workerId))
+    .returning();
+
+  if (!worker) {
+    res.status(404).json({ error: "Worker not found" });
+    return;
+  }
+
+  res.json(mapWorker(worker));
+});
+
+router.delete("/workers/:workerId/face", requireAuth, requireRole(["admin", "hr"]), async (req, res) => {
+  const params = RegisterFaceParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid workerId" });
+    return;
+  }
+
+  const [worker] = await db
+    .update(workersTable)
+    .set({ faceDescriptor: null })
+    .where(eq(workersTable.id, params.data.workerId))
     .returning();
 
   if (!worker) {

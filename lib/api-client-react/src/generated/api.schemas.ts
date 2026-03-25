@@ -490,6 +490,21 @@ export interface ListWorkersQueryParams {
   status?: string;
 }
 
+export interface UploadUrlRequest {
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+}
+
+export interface RegisterFaceRequest {
+  faceDescriptor: string;
+}
+
 export type ListUsersParams = {
   role?: string;
   departmentId?: number;

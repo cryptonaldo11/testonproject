@@ -1,39 +1,69 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListMedicalCertificates, useCreateMedicalCertificate } from "@workspace/api-client-react";
 import { Card, Badge, Button, Input, Label } from "@/components/ui/core";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { Upload, FileCheck2 } from "lucide-react";
+import { Upload, FileCheck2, X, Loader2 } from "lucide-react";
+import { useUpload } from "@workspace/object-storage-web";
 
 export default function MedicalCertificates() {
   const { user, hasRole } = useAuth();
   const isAdminHR = hasRole(["admin", "hr"]);
   const [isUploading, setIsUploading] = useState(false);
-  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [clinicName, setClinicName] = useState("");
+  const [doctorName, setDoctorName] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { data: mcData, refetch } = useListMedicalCertificates(
     isAdminHR ? {} : { userId: user?.id }
   );
 
-  const createMCMutation = useCreateMedicalCertificate({ onSuccess: () => { setIsUploading(false); refetch(); }});
-
-  const handleUpload = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if(user?.id) {
-      // Mocking file upload to API by just passing URLs for now
-      createMCMutation.mutate({
-        data: {
-          userId: user.id,
-          fileName: "mc_document_scanned.pdf",
-          fileUrl: "/mock/url",
-          fileType: "application/pdf",
-          clinicName: "General Clinic",
-          doctorName: "Dr. Smith",
-          issueDate: new Date().toISOString().split('T')[0]
-        }
-      });
+  const createMCMutation = useCreateMedicalCertificate({
+    mutation: {
+      onSuccess: () => {
+        setIsUploading(false);
+        setSelectedFile(null);
+        setClinicName("");
+        setDoctorName("");
+        refetch();
+      }
     }
+  });
+
+  const { uploadFile, isUploading: isFileUploading, progress } = useUpload({
+    basePath: "/api/storage",
+    onError: (err) => console.error("Upload error:", err),
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
   };
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user?.id || !selectedFile) return;
+
+    const uploadResult = await uploadFile(selectedFile);
+    if (!uploadResult) return;
+
+    createMCMutation.mutate({
+      data: {
+        userId: user.id,
+        fileName: selectedFile.name,
+        fileUrl: uploadResult.objectPath,
+        fileType: selectedFile.type || "application/octet-stream",
+        clinicName: clinicName || undefined,
+        doctorName: doctorName || undefined,
+        issueDate: issueDate || undefined,
+      }
+    });
+  };
+
+  const isPending = isFileUploading || createMCMutation.isPending;
 
   return (
     <DashboardLayout>
@@ -52,16 +82,83 @@ export default function MedicalCertificates() {
       {isUploading && (
         <Card className="mb-8 border-primary/20 bg-primary/5">
           <div className="p-6">
-            <h3 className="font-display font-bold text-xl mb-4">Upload Medical Certificate</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-display font-bold text-xl">Upload Medical Certificate</h3>
+              <Button variant="ghost" size="sm" onClick={() => setIsUploading(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
             <form onSubmit={handleUpload} className="grid grid-cols-1 gap-4">
-              <div className="border-2 border-dashed border-primary/30 rounded-xl p-8 text-center bg-white">
+              <div
+                className="border-2 border-dashed border-primary/30 rounded-xl p-8 text-center bg-white cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <FileCheck2 className="w-12 h-12 mx-auto text-primary/50 mb-4" />
-                <p className="text-sm text-muted-foreground mb-4">Drag and drop PDF or Image file here, or click to browse</p>
-                <Input type="file" accept=".pdf,image/*" required className="max-w-xs mx-auto" />
+                {selectedFile ? (
+                  <div>
+                    <p className="font-semibold text-primary">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Drag and drop PDF or Image file here, or click to browse</p>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </div>
-              <div className="flex justify-end gap-3 mt-4">
+
+              {isFileUploading && (
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="clinicName">Clinic Name</Label>
+                  <Input
+                    id="clinicName"
+                    value={clinicName}
+                    onChange={e => setClinicName(e.target.value)}
+                    placeholder="e.g. General Clinic"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="doctorName">Doctor Name</Label>
+                  <Input
+                    id="doctorName"
+                    value={doctorName}
+                    onChange={e => setDoctorName(e.target.value)}
+                    placeholder="e.g. Dr. Smith"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="issueDate">Issue Date</Label>
+                  <Input
+                    id="issueDate"
+                    type="date"
+                    value={issueDate}
+                    onChange={e => setIssueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-2">
                 <Button type="button" variant="ghost" onClick={() => setIsUploading(false)}>Cancel</Button>
-                <Button type="submit" disabled={createMCMutation.isPending}>Upload Document</Button>
+                <Button type="submit" disabled={isPending || !selectedFile}>
+                  {isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                  ) : (
+                    "Upload Document"
+                  )}
+                </Button>
               </div>
             </form>
           </div>
@@ -80,7 +177,7 @@ export default function MedicalCertificates() {
                 </div>
               </div>
               <Badge variant={
-                mc.verificationStatus === 'verified' ? 'success' : 
+                mc.verificationStatus === 'verified' ? 'success' :
                 mc.verificationStatus === 'suspicious' ? 'destructive' : 'warning'
               } className="capitalize">{mc.verificationStatus}</Badge>
             </div>
@@ -89,7 +186,11 @@ export default function MedicalCertificates() {
               <div className="flex justify-between"><span className="text-muted-foreground">Clinic:</span> <span className="font-medium">{mc.clinicName || '-'}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Doctor:</span> <span className="font-medium">{mc.doctorName || '-'}</span></div>
               <div className="pt-4 mt-4 border-t flex justify-end">
-                 <Button variant="outline" size="sm">View Document</Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`/api/storage/objects${mc.fileUrl}`} target="_blank" rel="noopener noreferrer">
+                    View Document
+                  </a>
+                </Button>
               </div>
             </div>
           </Card>

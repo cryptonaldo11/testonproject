@@ -777,6 +777,70 @@ export const GetUserProductivityResponse = zod.object({
 });
 
 /**
+ * @summary Request a presigned URL for file upload
+ */
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string(),
+  size: zod.number(),
+  contentType: zod.string(),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string(),
+  objectPath: zod.string(),
+});
+
+/**
+ * @summary Register face descriptor for a worker (admin/hr)
+ */
+export const RegisterFaceParams = zod.object({
+  workerId: zod.coerce.number(),
+});
+
+export const RegisterFaceBody = zod.object({
+  faceDescriptor: zod.string(),
+});
+
+export const RegisterFaceResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  departmentId: zod.number().nullish(),
+  employeeId: zod.string().nullish(),
+  jobTitle: zod.string().nullish(),
+  workLocation: zod.string().nullish(),
+  contractType: zod.string().nullish(),
+  status: zod.string(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  hasFaceRegistered: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete face descriptor for a worker (admin/hr)
+ */
+export const DeleteFaceParams = zod.object({
+  workerId: zod.coerce.number(),
+});
+
+export const DeleteFaceResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  departmentId: zod.number().nullish(),
+  employeeId: zod.string().nullish(),
+  jobTitle: zod.string().nullish(),
+  workLocation: zod.string().nullish(),
+  contractType: zod.string().nullish(),
+  status: zod.string(),
+  startDate: zod.string().nullish(),
+  endDate: zod.string().nullish(),
+  hasFaceRegistered: zod.boolean(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
  * @summary List all roles
  */
 export const ListRolesResponse = zod.object({

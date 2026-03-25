@@ -103,6 +103,10 @@ All routes prefixed with `/api`:
 - `PUT /api/alerts/:id/read` — Mark alert as read
 - `GET/POST /api/productivity` — Productivity scores
 - `GET /api/productivity/report` — Man-hours & cost report
+- `POST /api/storage/uploads/request-url` — Request presigned URL for file upload
+- `POST /api/workers/:id/face` — Register face descriptor for worker (admin/hr)
+- `DELETE /api/workers/:id/face` — Remove face descriptor for worker (admin/hr)
+- `GET /api/leaves/balance/:userId` — Get leave balance for user (annual + medical)
 
 ## TypeScript & Composite Projects
 
@@ -151,6 +155,12 @@ Drizzle ORM with PostgreSQL.
 ### `lib/api-spec` (`@workspace/api-spec`)
 
 OpenAPI 3.1 spec (`openapi.yaml`) + Orval config. Run codegen: `pnpm --filter @workspace/api-spec run codegen`
+
+**Important**: When adding new paths to `openapi.yaml`, always ensure there is a blank line between path entries. Missing blank lines cause orval to fail with "Failed to resolve input". Also avoid duplicate path/schema names — orval will fail silently or with the same error.
+
+### `lib/object-storage-web` (`@workspace/object-storage-web`)
+
+Web client library for object storage. Provides `useUpload` hook and `ObjectUploader` component for two-step presigned URL upload flow. The API server must have the storage route mounted at `/api/storage`. Usage: `useUpload({ basePath: "/api/storage" })`.
 
 ### `scripts` (`@workspace/scripts`)
 

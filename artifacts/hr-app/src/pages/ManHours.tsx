@@ -4,11 +4,54 @@ import { useGetAttendanceSummary } from "@workspace/api-client-react";
 import { Card, Input } from "@/components/ui/core";
 import { FileDown, DollarSign, Clock } from "lucide-react";
 
+function exportToCsv(data: {
+  items: { userId: number; userName: string; presentDays: number; totalHours: string; hourlyRate: string; totalCost: string }[];
+  totalManHours: string;
+  totalCost: string;
+}, startDate: string, endDate: string) {
+  const headers = ["Employee", "User ID", "Days Worked", "Total Hours", "Hourly Rate (SGD)", "Total Cost (SGD)"];
+  const rows = data.items.map(item => [
+    `"${item.userName}"`,
+    item.userId,
+    item.presentDays,
+    item.totalHours,
+    item.hourlyRate,
+    item.totalCost,
+  ]);
+
+  const summaryRows = [
+    [],
+    ["Summary"],
+    ["Period", `${startDate} to ${endDate}`],
+    ["Total Man-Hours", data.totalManHours],
+    ["Total Cost (SGD)", data.totalCost],
+  ];
+
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(r => r.join(",")),
+    ...summaryRows.map(r => r.join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `manhours_${startDate}_${endDate}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ManHours() {
-  const [startDate, setStartDate] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0]); // First day of month
+  const [startDate, setStartDate] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const { data: summaryData, isLoading } = useGetAttendanceSummary({ startDate, endDate });
+
+  const handleExport = () => {
+    if (!summaryData?.items?.length) return;
+    exportToCsv(summaryData as any, startDate, endDate);
+  };
 
   return (
     <DashboardLayout>
@@ -21,8 +64,12 @@ export default function ManHours() {
           <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-auto" />
           <span className="self-center font-medium text-muted-foreground">to</span>
           <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-auto" />
-          <button className="flex items-center gap-2 px-4 py-2 bg-secondary text-primary font-semibold rounded-xl hover:bg-secondary/80 transition-colors">
-            <FileDown className="w-4 h-4" /> Export
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-secondary text-primary font-semibold rounded-xl hover:bg-secondary/80 transition-colors disabled:opacity-50"
+            onClick={handleExport}
+            disabled={!summaryData?.items?.length}
+          >
+            <FileDown className="w-4 h-4" /> Export CSV
           </button>
         </div>
       </div>
@@ -41,7 +88,7 @@ export default function ManHours() {
           <div className="p-6 flex items-center justify-between">
             <div>
               <p className="text-emerald-100/80 font-medium mb-1">Total Estimated Cost</p>
-              <h2 className="text-4xl font-display font-bold"><span className="text-xl font-normal opacity-80">$</span>{summaryData?.totalCost || "0.00"}</h2>
+              <h2 className="text-4xl font-display font-bold"><span className="text-xl font-normal opacity-80">SGD $</span>{summaryData?.totalCost || "0.00"}</h2>
             </div>
             <DollarSign className="w-12 h-12 opacity-50" />
           </div>
@@ -67,13 +114,16 @@ export default function ManHours() {
                 <tr key={item.userId} className="hover:bg-accent/10 transition-colors">
                   <td className="px-6 py-4 font-medium text-foreground">{item.userName}</td>
                   <td className="px-6 py-4 text-center">
-                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-primary font-bold">{item.presentDays}</span>
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-primary font-bold">{item.presentDays}</span>
                   </td>
                   <td className="px-6 py-4 text-center font-mono font-semibold">{item.totalHours}</td>
-                  <td className="px-6 py-4 text-right text-muted-foreground">${item.hourlyRate}/hr</td>
-                  <td className="px-6 py-4 text-right font-display font-bold text-lg">${item.totalCost}</td>
+                  <td className="px-6 py-4 text-right text-muted-foreground">SGD ${item.hourlyRate}/hr</td>
+                  <td className="px-6 py-4 text-right font-display font-bold text-lg">SGD ${item.totalCost}</td>
                 </tr>
               ))}
+              {!isLoading && !summaryData?.items?.length && (
+                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No data for selected period.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

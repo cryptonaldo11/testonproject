@@ -10,6 +10,7 @@ import leavesRouter from "./leaves";
 import medicalCertificatesRouter from "./medical_certificates";
 import alertsRouter from "./alerts";
 import productivityRouter from "./productivity";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(leavesRouter);
 router.use(medicalCertificatesRouter);
 router.use(alertsRouter);
 router.use(productivityRouter);
+router.use(storageRouter);
 
 export default router;

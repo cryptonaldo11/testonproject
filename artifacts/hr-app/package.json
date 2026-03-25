@@ -72,9 +72,15 @@
     "vaul": "^1.1.2",
     "vite": "catalog:",
     "wouter": "^3.3.5",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@workspace/object-storage-web": "workspace:*"
   },
   "dependencies": {
+    "@uppy/aws-s3": "^5.1.0",
+    "@uppy/core": "^5.2.0",
+    "@uppy/dashboard": "^5.1.1",
+    "@uppy/react": "^5.2.0",
+    "face-api.js": "^0.22.2",
     "jwt-decode": "^4.0.0"
   }
 }

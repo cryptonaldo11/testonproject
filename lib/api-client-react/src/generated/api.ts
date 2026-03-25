@@ -54,6 +54,7 @@ import type {
   MedicalCertificateResponse,
   MessageResponse,
   ProductivityListResponse,
+  RegisterFaceRequest,
   RoleListResponse,
   RoleResponse,
   UpdateAlertRequest,
@@ -63,6 +64,8 @@ import type {
   UpdateMedicalCertificateRequest,
   UpdateUserRequest,
   UpdateWorkerRequest,
+  UploadUrlRequest,
+  UploadUrlResponse,
   UserListResponse,
   UserResponse,
   WorkerListResponse,
@@ -3079,6 +3082,263 @@ export function useGetUserProductivity<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Request a presigned URL for file upload
+ */
+export const getRequestUploadUrlUrl = () => {
+  return `/api/storage/uploads/request-url`;
+};
+
+export const requestUploadUrl = async (
+  uploadUrlRequest: UploadUrlRequest,
+  options?: RequestInit,
+): Promise<UploadUrlResponse> => {
+  return customFetch<UploadUrlResponse>(getRequestUploadUrlUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(uploadUrlRequest),
+  });
+};
+
+export const getRequestUploadUrlMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    TError,
+    { data: BodyType<UploadUrlRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestUploadUrl>>,
+  TError,
+  { data: BodyType<UploadUrlRequest> },
+  TContext
+> => {
+  const mutationKey = ["requestUploadUrl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    { data: BodyType<UploadUrlRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestUploadUrl(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestUploadUrlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestUploadUrl>>
+>;
+export type RequestUploadUrlMutationBody = BodyType<UploadUrlRequest>;
+export type RequestUploadUrlMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request a presigned URL for file upload
+ */
+export const useRequestUploadUrl = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestUploadUrl>>,
+    TError,
+    { data: BodyType<UploadUrlRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestUploadUrl>>,
+  TError,
+  { data: BodyType<UploadUrlRequest> },
+  TContext
+> => {
+  return useMutation(getRequestUploadUrlMutationOptions(options));
+};
+
+/**
+ * @summary Register face descriptor for a worker (admin/hr)
+ */
+export const getRegisterFaceUrl = (workerId: number) => {
+  return `/api/workers/${workerId}/face`;
+};
+
+export const registerFace = async (
+  workerId: number,
+  registerFaceRequest: RegisterFaceRequest,
+  options?: RequestInit,
+): Promise<WorkerResponse> => {
+  return customFetch<WorkerResponse>(getRegisterFaceUrl(workerId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(registerFaceRequest),
+  });
+};
+
+export const getRegisterFaceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof registerFace>>,
+    TError,
+    { workerId: number; data: BodyType<RegisterFaceRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof registerFace>>,
+  TError,
+  { workerId: number; data: BodyType<RegisterFaceRequest> },
+  TContext
+> => {
+  const mutationKey = ["registerFace"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof registerFace>>,
+    { workerId: number; data: BodyType<RegisterFaceRequest> }
+  > = (props) => {
+    const { workerId, data } = props ?? {};
+
+    return registerFace(workerId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RegisterFaceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof registerFace>>
+>;
+export type RegisterFaceMutationBody = BodyType<RegisterFaceRequest>;
+export type RegisterFaceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Register face descriptor for a worker (admin/hr)
+ */
+export const useRegisterFace = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof registerFace>>,
+    TError,
+    { workerId: number; data: BodyType<RegisterFaceRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof registerFace>>,
+  TError,
+  { workerId: number; data: BodyType<RegisterFaceRequest> },
+  TContext
+> => {
+  return useMutation(getRegisterFaceMutationOptions(options));
+};
+
+/**
+ * @summary Delete face descriptor for a worker (admin/hr)
+ */
+export const getDeleteFaceUrl = (workerId: number) => {
+  return `/api/workers/${workerId}/face`;
+};
+
+export const deleteFace = async (
+  workerId: number,
+  options?: RequestInit,
+): Promise<WorkerResponse> => {
+  return customFetch<WorkerResponse>(getDeleteFaceUrl(workerId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteFaceMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFace>>,
+    TError,
+    { workerId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteFace>>,
+  TError,
+  { workerId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteFace"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteFace>>,
+    { workerId: number }
+  > = (props) => {
+    const { workerId } = props ?? {};
+
+    return deleteFace(workerId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteFaceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteFace>>
+>;
+
+export type DeleteFaceMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete face descriptor for a worker (admin/hr)
+ */
+export const useDeleteFace = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFace>>,
+    TError,
+    { workerId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteFace>>,
+  TError,
+  { workerId: number },
+  TContext
+> => {
+  return useMutation(getDeleteFaceMutationOptions(options));
+};
 
 /**
  * @summary List all roles
