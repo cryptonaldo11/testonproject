@@ -1,12 +1,11 @@
 # Product Requirements Document (PRD)
 ## Workforce-AI-Insights → AI-Driven Workforce Operations Platform
 
-> **Implementation Status**: Phase 3 Sprint A — Dashboard AI Summaries (fully implemented & deployed 2026-03-29)
-> - ✅ Worker dashboard: real attendance rate, leave balance, hours worked, face verification status, pending leaves/alerts
-> - ✅ Manager dashboard: team today attendance, open exceptions, alerts, pending leaves, overall health score
-> - ✅ Admin/HR dashboard: workforce health, MC expiry queue, leave queue, exception queue, productivity outliers, top priority items
-> - Pure frontend computation using existing TanStack Query hooks — no new API endpoints or DB migrations
-> - Phase 2 (Workflows) still fully deployed (see deployment record below)
+> **Implementation Status**: Phase 3 — Sprint A + Sprint B fully implemented & deployed (2026-03-29)
+> - ✅ Sprint A: Dashboard AI summary cards for Worker, Manager, Admin/HR
+> - ✅ Sprint B: Productivity trend charts (recharts) on Dashboard and Productivity page
+> - ✅ UI/UX fixes: SSR-safe sidebar, skeleton loading, toast notifications
+> - Phase 2 (Workflows) fully deployed
 
 ### Deployment Record (2026-03-29)
 
@@ -36,19 +35,18 @@
 
 ---
 
-**Deployment Record — Phase 3 Sprint A (2026-03-29)**
+**Deployment Record — Phase 3 (Sprint A + Sprint B + UI/UX fixes) (2026-03-29)**
 
 | Component | Target | Status |
 |-----------|--------|--------|
-| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-CbX5V32k.js` |
-| **API** | Render (`teston-api`) — `deploy` branch | 🔄 GitHub push sent (commit `7a567aa`), auto-deploy in progress |
+| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-COm9ISIC.js` |
+| **API** | Render (`teston-api`) — `deploy` branch | 🔄 GitHub push sent (commit `7db4e39`), auto-deploy in progress |
 
-**Phase 3 Sprint A changes (frontend only, pure computation):**
-- Dashboard: AI summary card with role-specific health scores and narrative signals
-  - Worker: real attendance rate, leave balance, hours worked, face verification status, pending leaves/alerts
-  - Manager: team today attendance, open exceptions, alerts, pending leaves, overall health score
-  - Admin/HR: workforce health, MC expiry queue, leave queue, exception queue, productivity outliers, top priority items
-- No new API endpoints, no DB migrations, no backend changes
+**Phase 3 Sprint A changes:** AI summary card with role-specific health scores and narrative signals. No backend changes.
+
+**Phase 3 Sprint B changes:** Recharts productivity trend charts on Dashboard and Productivity page.
+
+**UI/UX fix changes:** SSR-safe sidebar, skeleton loading on Dashboard/Leaves/Attendance, toast notifications for all mutations.
 
 ## 1. Product Vision
 
@@ -866,6 +864,31 @@ Role-specific AI summary cards on the dashboard. Pure frontend computation using
 **Admin/HR dashboard:** workforce health (open/overdue/critical alerts), queues (pending MCs/leaves/exceptions), MC expiring soon count, productivity outliers (score < 60), top 3 priority items by severity.
 
 **Files:** `artifacts/hr-app/src/lib/aiSummaryService.ts`, `artifacts/hr-app/src/pages/Dashboard.tsx`
+
+### Sprint B: Productivity Intelligence ✅ (2026-03-29)
+
+Recharts-powered productivity trend charts on Dashboard and Productivity page. Uses existing `useListProductivityScores` hook data.
+
+**Dashboard charts (inserted before AI Summary Card per role):**
+- Worker: 6-month BarChart of own scores, color-coded (green ≥80, amber 60-79, red <60)
+- Manager: team bar chart with individual worker scores + team average line overlay
+- Admin/HR: score distribution (0-59/60-79/80-100 buckets) + top 5 / bottom 5 performers ranked lists
+
+**Productivity.tsx enhancements:**
+- 12-month trend LineChart (overall score, attendance rate, punctuality rate)
+- Team score BarChart for operational roles
+
+**Files:** `artifacts/hr-app/src/pages/Dashboard.tsx`, `artifacts/hr-app/src/pages/Productivity.tsx`
+
+### UI/UX Quality Fixes ✅ (2026-03-29)
+
+**SSR fix:** `DashboardLayout.tsx` — `window.innerWidth` now guarded with `mounted` state + `useEffect`, preventing server-side crash.
+
+**Skeleton loading:** Skeleton shimmer rows added to Dashboard stat cards, Leaves table, and Attendance table using existing `@/components/ui/skeleton`.
+
+**Toast notifications:** Mutation feedback in Leaves.tsx, Attendance.tsx, and Alerts.tsx replaced with Sonner toast notifications (using existing `@/hooks/use-toast`). Inline feedback divs removed from Leaves.
+
+**Files:** `DashboardLayout.tsx`, `Dashboard.tsx`, `Leaves.tsx`, `Attendance.tsx`, `Alerts.tsx`
 
 ## Phase 4: Polish / Release
 Focus:
