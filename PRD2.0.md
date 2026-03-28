@@ -1,13 +1,37 @@
 # Product Requirements Document (PRD)
 ## Workforce-AI-Insights → AI-Driven Workforce Operations Platform
 
-> **Implementation Status**: Phase 2 — Workflows (fully implemented 2026-03-29)
+> **Implementation Status**: Phase 2 — Workflows (fully implemented & deployed 2026-03-29)
 > - ✅ Actionable alerts lifecycle with assignment and expanded statuses
 > - ✅ Medical certificate reviewer attribution + pending review queue + expiry tracking/reminder alerts
 > - ✅ Attendance exception workflow (submission and review) — full frontend + backend
 > - ✅ Face verification audit logging + fallback flow + frontend UX
 > - ✅ Assignment/ownership permission helpers
 > - ✅ Integration tests: alerts workflow, attendance exceptions, face verification audit
+
+### Deployment Record (2026-03-29)
+
+| Component | Target | Status |
+|-----------|--------|--------|
+| **Database schema** | Neon Postgres (`testonHRdb`) | ✅ Live — `reminderSentAt` column, `mc_expiring_soon`/`mc_expired` alert types |
+| **API** | Render (`teston-api`) — `deploy` branch | ✅ Live — commit `f997ec7`, dep `dep-d742bgmuk2gs739u3veg` |
+| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-D13oYOBb.js` |
+
+**New endpoints deployed:**
+- `POST /api/medical-certificates/check-expiry` — scan for expiring MCs, create alerts (admin/HR)
+- `GET/POST /api/attendance-exceptions` — list/create exceptions
+- `GET/PATCH /api/attendance-exceptions/:id` — review exceptions (manager/HR)
+- `GET/POST /api/face-verification-attempts` — audit log
+- `GET /api/face-verification-attempts/user/:userId` — user-scoped attempts
+- `GET/PATCH /api/face-verification-attempts/:id` — single attempt / HR review
+- `PATCH /api/alerts/:id` — assignment, status transitions, resolution (updated)
+
+**Frontend pages updated:**
+- Dashboard: workflow queue card (pending MC reviews, open alerts), assigned alerts, quick actions
+- Medical Certificates: expiry badges, Expiring Soon/Expired filters, start/end date upload fields
+- Attendance: exception submission per log, review queue for managers/HR
+- CheckIn: face verification fallback flow, audit history display
+- Alerts: assignment dropdown, status lifecycle, resolution notes
 
 ## 1. Product Vision
 
