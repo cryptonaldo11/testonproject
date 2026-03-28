@@ -26,6 +26,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workforce_ai_insights_test
       JWT_SECRET: ci-test-secret
+      VITE_API_BASE_URL: https://teston-api.onrender.com
 
     steps:
       - name: Check out repository
