@@ -769,6 +769,43 @@ export interface CheckMcExpiryResponse {
   message?: string;
 }
 
+export type AnomalyType = (typeof AnomalyType)[keyof typeof AnomalyType];
+
+export const AnomalyType = {
+  attendance: "attendance",
+  leave: "leave",
+  productivity: "productivity",
+  compliance: "compliance",
+} as const;
+
+export type AnomalySeverity =
+  (typeof AnomalySeverity)[keyof typeof AnomalySeverity];
+
+export const AnomalySeverity = {
+  info: "info",
+  warning: "warning",
+  critical: "critical",
+} as const;
+
+export interface Anomaly {
+  /** Unique anomaly identifier (e.g. "att-5-2026-03") */
+  id: string;
+  type: AnomalyType;
+  severity: AnomalySeverity;
+  userId: number;
+  userName?: string | null;
+  /** Short human-readable summary */
+  message: string;
+  /** Detailed explanation of the anomaly */
+  detail: string;
+  detectedAt: string;
+}
+
+export interface AnomalyListResponse {
+  anomalies: Anomaly[];
+  total: number;
+}
+
 export type ListUsersParams = {
   role?: string;
   departmentId?: number;
@@ -848,6 +885,26 @@ export type GetProductivityReportParams = {
   month?: number;
   year?: number;
 };
+
+export type ListAnomaliesParams = {
+  /**
+   * Month to analyze, format YYYY-MM (e.g. 2026-03). Defaults to current month.
+   */
+  month?: string;
+  /**
+   * Filter results by severity level.
+   */
+  severity?: ListAnomaliesSeverity;
+};
+
+export type ListAnomaliesSeverity =
+  (typeof ListAnomaliesSeverity)[keyof typeof ListAnomaliesSeverity];
+
+export const ListAnomaliesSeverity = {
+  critical: "critical",
+  warning: "warning",
+  info: "info",
+} as const;
 
 export type ListWorkersParams = {
   departmentId?: number;

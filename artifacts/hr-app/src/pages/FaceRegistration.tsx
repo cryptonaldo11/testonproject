@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListWorkers, useRegisterFace, useDeleteFace, useListUsers } from "@workspace/api-client-react";
-import { Card, CardContent, Button, Badge } from "@/components/ui/core";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import { ADMIN_HR_ROLES, useAuth } from "@/lib/auth";
 import { Camera, CameraOff, CheckCircle2, AlertCircle, Scan, Trash2 } from "lucide-react";
 

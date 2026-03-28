@@ -2,7 +2,9 @@ import { useToast } from "@/hooks/use-toast";
 import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListAlerts, useUpdateAlert, useListUsers } from "@workspace/api-client-react";
-import { Card, Badge, Button } from "@/components/ui/core";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -45,6 +47,8 @@ export default function Alerts() {
   const [selectedAlert, setSelectedAlert] = useState<any | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [assignToUserId, setAssignToUserId] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const alertsQuery = isOperational
     ? statusFilter !== "all"
@@ -68,6 +72,12 @@ export default function Alerts() {
     }
     return map;
   }, [user, usersData?.users]);
+
+  const paginatedAlerts = useMemo(() => {
+    const all = alertsData?.alerts ?? [];
+    return all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [alertsData?.alerts, page]);
+  const totalAlerts = alertsData?.total ?? alertsData?.alerts?.length ?? 0;
 
   const updateAlertMutation = useUpdateAlert({
     mutation: {
@@ -167,14 +177,14 @@ export default function Alerts() {
       </div>
 
       <div className="space-y-4">
-        {alertsData?.alerts?.length === 0 && (
+        {totalAlerts === 0 && (
           <Card className="p-12 text-center text-muted-foreground bg-transparent border-dashed">
             <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-400 mb-4 opacity-50" />
             All clear! No alerts found.
           </Card>
         )}
 
-        {alertsData?.alerts?.map((alert) => (
+        {paginatedAlerts.map((alert) => (
           <Card
             key={alert.id}
             className={`border-l-4 ${
@@ -245,6 +255,17 @@ export default function Alerts() {
             </div>
           </Card>
         ))}
+        {totalAlerts > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-4 py-3 border rounded-xl bg-card">
+            <p className="text-sm text-muted-foreground">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalAlerts)} of {totalAlerts}
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+              <Button size="sm" variant="outline" onClick={() => setPage(p => p + 1)} disabled={paginatedAlerts.length < PAGE_SIZE}>Next</Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Dialog open={!!selectedAlert} onOpenChange={(open) => !open && setSelectedAlert(null)}>
