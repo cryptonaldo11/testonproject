@@ -40,7 +40,7 @@
 
 | Component | Target | Status |
 |-----------|--------|--------|
-| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-D_H3pxYR.js` |
+| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-CUsjaAmZ.js` |
 | **API** | Render (`teston-api`) — `deploy` branch | ✅ Live — commit `272251f` |
 
 **Phase 3 Sprint C changes:**
