@@ -1,23 +1,24 @@
 # Product Requirements Document (PRD)
 ## Workforce-AI-Insights → AI-Driven Workforce Operations Platform
 
-> **Implementation Status**: Phase 2 — Workflows (fully implemented & deployed 2026-03-29)
-> - ✅ Actionable alerts lifecycle with assignment and expanded statuses
-> - ✅ Medical certificate reviewer attribution + pending review queue + expiry tracking/reminder alerts
-> - ✅ Attendance exception workflow (submission and review) — full frontend + backend
-> - ✅ Face verification audit logging + fallback flow + frontend UX
-> - ✅ Assignment/ownership permission helpers
-> - ✅ Integration tests: alerts workflow, attendance exceptions, face verification audit
+> **Implementation Status**: Phase 3 Sprint A — Dashboard AI Summaries (fully implemented & deployed 2026-03-29)
+> - ✅ Worker dashboard: real attendance rate, leave balance, hours worked, face verification status, pending leaves/alerts
+> - ✅ Manager dashboard: team today attendance, open exceptions, alerts, pending leaves, overall health score
+> - ✅ Admin/HR dashboard: workforce health, MC expiry queue, leave queue, exception queue, productivity outliers, top priority items
+> - Pure frontend computation using existing TanStack Query hooks — no new API endpoints or DB migrations
+> - Phase 2 (Workflows) still fully deployed (see deployment record below)
 
 ### Deployment Record (2026-03-29)
+
+**Deployment Record — Phase 2 (2026-03-29)**
 
 | Component | Target | Status |
 |-----------|--------|--------|
 | **Database schema** | Neon Postgres (`testonHRdb`) | ✅ Live — `reminderSentAt` column, `mc_expiring_soon`/`mc_expired` alert types |
 | **API** | Render (`teston-api`) — `deploy` branch | ✅ Live — commit `f997ec7`, dep `dep-d742bgmuk2gs739u3veg` |
-| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-D13oYOBb.js` |
+| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Superseded by Sprint A (see below) |
 
-**New endpoints deployed:**
+**Phase 2 new endpoints deployed:**
 - `POST /api/medical-certificates/check-expiry` — scan for expiring MCs, create alerts (admin/HR)
 - `GET/POST /api/attendance-exceptions` — list/create exceptions
 - `GET/PATCH /api/attendance-exceptions/:id` — review exceptions (manager/HR)
@@ -26,12 +27,28 @@
 - `GET/PATCH /api/face-verification-attempts/:id` — single attempt / HR review
 - `PATCH /api/alerts/:id` — assignment, status transitions, resolution (updated)
 
-**Frontend pages updated:**
+**Phase 2 frontend pages updated:**
 - Dashboard: workflow queue card (pending MC reviews, open alerts), assigned alerts, quick actions
 - Medical Certificates: expiry badges, Expiring Soon/Expired filters, start/end date upload fields
 - Attendance: exception submission per log, review queue for managers/HR
 - CheckIn: face verification fallback flow, audit history display
 - Alerts: assignment dropdown, status lifecycle, resolution notes
+
+---
+
+**Deployment Record — Phase 3 Sprint A (2026-03-29)**
+
+| Component | Target | Status |
+|-----------|--------|--------|
+| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-CbX5V32k.js` |
+| **API** | Render (`teston-api`) — `deploy` branch | 🔄 GitHub push sent (commit `7a567aa`), auto-deploy in progress |
+
+**Phase 3 Sprint A changes (frontend only, pure computation):**
+- Dashboard: AI summary card with role-specific health scores and narrative signals
+  - Worker: real attendance rate, leave balance, hours worked, face verification status, pending leaves/alerts
+  - Manager: team today attendance, open exceptions, alerts, pending leaves, overall health score
+  - Admin/HR: workforce health, MC expiry queue, leave queue, exception queue, productivity outliers, top priority items
+- No new API endpoints, no DB migrations, no backend changes
 
 ## 1. Product Vision
 
@@ -838,11 +855,17 @@ Focus:
 - recommendation engine
 - trend and combined-signal insights
 
-Deliverables:
-- role-based AI summaries
-- manager operational insights
-- HR workforce risk insights
-- productivity drivers and recommendations
+### Sprint A: Dashboard AI Summaries ✅ (2026-03-29)
+
+Role-specific AI summary cards on the dashboard. Pure frontend computation using existing TanStack Query hooks — no new API endpoints or DB migrations.
+
+**Worker dashboard:** real attendance rate, leave balance, hours worked this month, face verification status, pending leaves, active alerts, health status badge.
+
+**Manager dashboard:** team today attendance (checked in / absent / late), open exceptions, active alerts with critical flagging, pending leave count, overall health score.
+
+**Admin/HR dashboard:** workforce health (open/overdue/critical alerts), queues (pending MCs/leaves/exceptions), MC expiring soon count, productivity outliers (score < 60), top 3 priority items by severity.
+
+**Files:** `artifacts/hr-app/src/lib/aiSummaryService.ts`, `artifacts/hr-app/src/pages/Dashboard.tsx`
 
 ## Phase 4: Polish / Release
 Focus:
