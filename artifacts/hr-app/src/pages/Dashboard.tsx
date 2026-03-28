@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ADMIN_HR_ROLES, MANAGER_ROLES, SELF_SERVICE_ROLES, useAuth } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Clock, CalendarX, TrendingUp, TrendingDown, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare, Sparkles } from "lucide-react";
 import { useListUsers, useListAttendance, useListLeaves, useListAlerts, useListMedicalCertificates, useListProductivityScores, useGetLeaveBalance, useGetAttendanceSummary, useGetProductivityReport, useListAttendanceExceptions, useListFaceVerificationAttemptsByUser } from "@workspace/api-client-react";

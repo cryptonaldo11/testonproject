@@ -19,6 +19,7 @@ import type {
 import type {
   AlertListResponse,
   AlertResponse,
+  AnomalyListResponse,
   AttendanceExceptionListResponse,
   AttendanceExceptionResponse,
   AttendanceListResponse,
@@ -57,6 +58,7 @@ import type {
   LeaveListResponse,
   LeaveResponse,
   ListAlertsParams,
+  ListAnomaliesParams,
   ListAttendanceExceptionsParams,
   ListAttendanceParams,
   ListFaceVerificationAttemptsByUserParams,
@@ -4456,6 +4458,104 @@ export const useRequestUploadUrl = <
 > => {
   return useMutation(getRequestUploadUrlMutationOptions(options));
 };
+
+/**
+ * Runs the anomaly detection engine across attendance, leave, and productivity data
+for the specified month (or the current month by default). Returns flagged items
+sorted by severity (critical first).
+
+ * @summary Detect anomalies
+ */
+export const getListAnomaliesUrl = (params?: ListAnomaliesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/anomalies?${stringifiedParams}`
+    : `/api/anomalies`;
+};
+
+export const listAnomalies = async (
+  params?: ListAnomaliesParams,
+  options?: RequestInit,
+): Promise<AnomalyListResponse> => {
+  return customFetch<AnomalyListResponse>(getListAnomaliesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAnomaliesQueryKey = (params?: ListAnomaliesParams) => {
+  return [`/api/anomalies`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAnomaliesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAnomalies>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params?: ListAnomaliesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAnomalies>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAnomaliesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAnomalies>>> = ({
+    signal,
+  }) => listAnomalies(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAnomalies>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAnomaliesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAnomalies>>
+>;
+export type ListAnomaliesQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Detect anomalies
+ */
+
+export function useListAnomalies<
+  TData = Awaited<ReturnType<typeof listAnomalies>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params?: ListAnomaliesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAnomalies>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAnomaliesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get the logged-in worker's registered face descriptor

@@ -2,7 +2,9 @@ import React from "react";
 import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListUsers } from "@workspace/api-client-react";
-import { Card, Badge, Button } from "@/components/ui/core";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import { ADMIN_ONLY_ROLES, useAuth } from "@/lib/auth";
 import { UserPlus } from "lucide-react";
 

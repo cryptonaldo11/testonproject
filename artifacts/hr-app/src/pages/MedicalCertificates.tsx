@@ -6,7 +6,8 @@ import {
   useListUsers,
   useUpdateMedicalCertificate,
 } from "@workspace/api-client-react";
-import { Card, Badge, Input, Label } from "@/components/ui/core";
+import { Card } from "@/components/ui/card";
+import { Badge, Input, Label } from "@/components/ui/core";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

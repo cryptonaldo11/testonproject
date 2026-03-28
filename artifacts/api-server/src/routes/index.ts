@@ -13,6 +13,7 @@ import productivityRouter from "./productivity";
 import storageRouter from "./storage";
 import attendanceExceptionsRouter from "./attendance_exceptions";
 import faceVerificationRouter from "./face_verification";
+import anomaliesRouter from "./anomalies";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(productivityRouter);
 router.use(storageRouter);
 router.use(attendanceExceptionsRouter);
 router.use(faceVerificationRouter);
+router.use(anomaliesRouter);
 
 export default router;

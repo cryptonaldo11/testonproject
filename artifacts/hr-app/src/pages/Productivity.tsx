@@ -9,7 +9,9 @@ import {
   useListUsers,
 } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge } from "@/components/ui/core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input, Label, Badge } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,

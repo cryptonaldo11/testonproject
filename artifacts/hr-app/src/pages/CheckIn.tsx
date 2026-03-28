@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/lib/auth";
 import { useCheckIn, useCheckOut, useListAttendance, useGetMyFaceDescriptor } from "@workspace/api-client-react";
-import { Card, CardContent, Button } from "@/components/ui/core";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Clock, MapPin, CheckCircle2, Camera, CameraOff, AlertCircle, ShieldAlert, ClipboardList } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import {

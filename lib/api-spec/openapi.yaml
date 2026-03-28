@@ -36,6 +36,8 @@ tags:
     description: Productivity scoring
   - name: storage
     description: Object storage endpoints
+  - name: anomalies
+    description: Anomaly detection engine
 paths:
   /healthz:
     get:
@@ -1134,6 +1136,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadUrlResponse"
+
+  /anomalies:
+    get:
+      operationId: listAnomalies
+      tags: [anomalies]
+      summary: Detect anomalies
+      description: |
+        Runs the anomaly detection engine across attendance, leave, and productivity data
+        for the specified month (or the current month by default). Returns flagged items
+        sorted by severity (critical first).
+      parameters:
+        - in: query
+          name: month
+          schema:
+            type: string
+          description: "Month to analyze, format YYYY-MM (e.g. 2026-03). Defaults to current month."
+        - in: query
+          name: severity
+          schema:
+            type: string
+            enum: [critical, warning, info]
+          description: Filter results by severity level.
+      responses:
+        "200":
+          description: Anomalies detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnomalyListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden — admin, hr, or manager role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /workers/me/face-descriptor:
     get:
@@ -2675,3 +2718,51 @@ components:
           description: Number of certificates skipped (already had open alerts)
         message:
           type: string
+
+    Anomaly:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique anomaly identifier (e.g. "att-5-2026-03")
+        type:
+          type: string
+          enum: [attendance, leave, productivity, compliance]
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        userId:
+          type: number
+        userName:
+          type: string
+          nullable: true
+        message:
+          type: string
+          description: Short human-readable summary
+        detail:
+          type: string
+          description: Detailed explanation of the anomaly
+        detectedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - severity
+        - userId
+        - message
+        - detail
+        - detectedAt
+
+    AnomalyListResponse:
+      type: object
+      properties:
+        anomalies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Anomaly"
+        total:
+          type: number
+      required:
+        - anomalies
+        - total

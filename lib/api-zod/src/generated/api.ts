@@ -1262,6 +1262,44 @@ export const RequestUploadUrlResponse = zod.object({
 });
 
 /**
+ * Runs the anomaly detection engine across attendance, leave, and productivity data
+for the specified month (or the current month by default). Returns flagged items
+sorted by severity (critical first).
+
+ * @summary Detect anomalies
+ */
+export const ListAnomaliesQueryParams = zod.object({
+  month: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Month to analyze, format YYYY-MM (e.g. 2026-03). Defaults to current month.",
+    ),
+  severity: zod
+    .enum(["critical", "warning", "info"])
+    .optional()
+    .describe("Filter results by severity level."),
+});
+
+export const ListAnomaliesResponse = zod.object({
+  anomalies: zod.array(
+    zod.object({
+      id: zod
+        .string()
+        .describe('Unique anomaly identifier (e.g. \"att-5-2026-03\")'),
+      type: zod.enum(["attendance", "leave", "productivity", "compliance"]),
+      severity: zod.enum(["info", "warning", "critical"]),
+      userId: zod.number(),
+      userName: zod.string().nullish(),
+      message: zod.string().describe("Short human-readable summary"),
+      detail: zod.string().describe("Detailed explanation of the anomaly"),
+      detectedAt: zod.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
  * @summary Get the logged-in worker's registered face descriptor
  */
 export const GetMyFaceDescriptorResponse = zod.object({

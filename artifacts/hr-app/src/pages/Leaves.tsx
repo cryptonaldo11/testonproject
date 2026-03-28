@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListLeaves, useCreateLeave, useListUsers, useUpdateLeave } from "@workspace/api-client-react";
-import { Card, Badge, Button, Input, Label } from "@/components/ui/core";
+import { Card } from "@/components/ui/card";
+import { Badge, Input, Label } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -61,10 +63,17 @@ export default function Leaves() {
   const [isApplying, setIsApplying] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ id: number; action: "approved" | "rejected" } | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const { data: leavesData, isLoading: leavesLoading, refetch } = useListLeaves(
     isOperational ? {} : { userId: user?.id },
   );
+  const paginatedLeaves = useMemo(() => {
+    const all = leavesData?.leaves ?? [];
+    return all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [leavesData?.leaves, page]);
+  const totalLeaves = leavesData?.total ?? leavesData?.leaves?.length ?? 0;
   const { data: usersData } = useListUsers(undefined, {
     query: {
       queryKey: ["leaves", "users"],
@@ -282,7 +291,7 @@ export default function Leaves() {
             <tbody className="divide-y divide-border">
               {leavesLoading
                 ? [...Array(5)].map((_, i) => skeletonRow(isAdminHR))
-                : leavesData?.leaves?.map((leave) => (
+                : paginatedLeaves.map((leave) => (
                   <tr key={leave.id} className="hover:bg-accent/20 transition-colors align-top">
                     <td className="px-6 py-4 font-medium">{getEmployeeLabel(leave.userId)}</td>
                     <td className="px-6 py-4 capitalize font-semibold text-primary">{leave.leaveType}</td>
@@ -340,6 +349,17 @@ export default function Leaves() {
                 ))}
             </tbody>
           </table>
+          {totalLeaves > PAGE_SIZE && (
+            <div className="flex items-center justify-between px-6 py-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalLeaves)} of {totalLeaves}
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+                <Button size="sm" variant="outline" onClick={() => setPage(p => p + 1)} disabled={paginatedLeaves.length < PAGE_SIZE}>Next</Button>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 

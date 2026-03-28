@@ -2,7 +2,9 @@ import { useToast } from "@/hooks/use-toast";
 import React, { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListAttendance, useListUsers } from "@workspace/api-client-react";
-import { Card, Badge, Input, Button } from "@/components/ui/core";
+import { Card } from "@/components/ui/card";
+import { Badge, Input } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { OPERATIONAL_ROLES, useAuth } from "@/lib/auth";
@@ -87,6 +89,8 @@ export default function Attendance() {
   const [reviewStatus, setReviewStatus] = useState<AttendanceExceptionStatus>("under_review");
   const [reviewNotes, setReviewNotes] = useState("");
   const [isUpdatingException, setIsUpdatingException] = useState(false);
+    const [exceptionPage, setExceptionPage] = useState(1);
+    const EXCEPTION_PAGE_SIZE = 10;
 
   const { data: attendanceData, isLoading } = useListAttendance({
     startDate: date,
@@ -135,6 +139,7 @@ export default function Attendance() {
   const visibleExceptions = isOperational
     ? exceptions.filter((exception) => openQueueStatuses.includes(exception.status))
     : exceptions;
+  const paginatedExceptions = visibleExceptions.slice((exceptionPage - 1) * EXCEPTION_PAGE_SIZE, exceptionPage * EXCEPTION_PAGE_SIZE);
 
   const openSubmitDialog = (log?: { id: number; checkIn?: string | null; checkOut?: string | null }) => {
     setSubmitAttendanceLogId(log?.id ?? null);
@@ -255,7 +260,7 @@ export default function Attendance() {
             </div>
           ) : (
             <div className="space-y-3">
-              {visibleExceptions.map((exception) => (
+              {paginatedExceptions.map((exception) => (
                 <div key={exception.id} className="rounded-xl border bg-secondary/20 p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
@@ -281,6 +286,17 @@ export default function Attendance() {
                   </div>
                 </div>
               ))}
+              {visibleExceptions.length > EXCEPTION_PAGE_SIZE && (
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(exceptionPage - 1) * EXCEPTION_PAGE_SIZE + 1}–{Math.min(exceptionPage * EXCEPTION_PAGE_SIZE, visibleExceptions.length)} of {visibleExceptions.length}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setExceptionPage(p => Math.max(1, p - 1))} disabled={exceptionPage === 1}>Previous</Button>
+                    <Button size="sm" variant="outline" onClick={() => setExceptionPage(p => p + 1)} disabled={paginatedExceptions.length < EXCEPTION_PAGE_SIZE}>Next</Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

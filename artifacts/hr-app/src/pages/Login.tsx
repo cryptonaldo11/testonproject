@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLogin } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, Input, Label, Button } from "@/components/ui/core";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input, Label } from "@/components/ui/core";
+import { Button } from "@/components/ui/button";
 import { Leaf, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 

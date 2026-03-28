@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useGetAttendanceSummary, type AttendanceSummaryResponse } from "@workspace/api-client-react";
-import { Card, Input } from "@/components/ui/core";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/core";
 import { useAuth } from "@/lib/auth";
 import { FileDown, DollarSign, Clock } from "lucide-react";
 
