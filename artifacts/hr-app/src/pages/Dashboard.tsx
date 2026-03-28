@@ -1,9 +1,17 @@
-import React from "react";
+import React, { useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ADMIN_HR_ROLES, MANAGER_ROLES, SELF_SERVICE_ROLES, useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/core";
-import { Users, Clock, CalendarX, TrendingUp, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare } from "lucide-react";
-import { useListUsers, useListAttendance, useListLeaves, useListAlerts, useListMedicalCertificates, useListProductivityScores } from "@workspace/api-client-react";
+import { Users, Clock, CalendarX, TrendingUp, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare, Sparkles } from "lucide-react";
+import { useListUsers, useListAttendance, useListLeaves, useListAlerts, useListMedicalCertificates, useListProductivityScores, useGetLeaveBalance, useGetAttendanceSummary, useGetProductivityReport, useListAttendanceExceptions, useListFaceVerificationAttemptsByUser } from "@workspace/api-client-react";
+import {
+  computeWorkerSummary,
+  computeManagerSummary,
+  computeAdminSummary,
+  type WorkerSummary,
+  type ManagerSummary,
+  type AdminSummary,
+} from "@/lib/aiSummaryService";
 
 interface StatCardProps {
   title: string;
@@ -36,6 +44,108 @@ function StatCard({ title, value, icon: Icon, trend, trendUp }: StatCardProps) {
   );
 }
 
+interface TopPriorityItem {
+  label: string;
+  count: number;
+  severity: string;
+}
+
+function AISummaryCard({ summary, role }: { summary: WorkerSummary | ManagerSummary | AdminSummary; role: "worker" | "manager" | "admin" }) {
+  const getHealthColor = (score: string) => {
+    switch (score) {
+      case "good": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "attention": return "bg-amber-50 text-amber-700 border-amber-200";
+      case "critical": return "bg-red-50 text-red-700 border-red-200";
+      default: return "bg-secondary/20 text-muted-foreground border-border";
+    }
+  };
+
+  const getHealthLabel = (score: string) => {
+    switch (score) {
+      case "good": return "All clear";
+      case "attention": return "Needs attention";
+      case "critical": return "Action required";
+      default: return "Unknown";
+    }
+  };
+
+  const getHealthIcon = (score: string) => {
+    if (score === "critical") return "🚨";
+    if (score === "attention") return "⚠️";
+    return "✅";
+  };
+
+  const healthScore = "overallHealth" in summary ? summary.overallHealth.score : "good";
+  const healthClass = getHealthColor(healthScore);
+  const healthLabel = getHealthLabel(healthScore);
+
+  return (
+    <div className={`mb-6 rounded-xl border-2 p-5 ${healthClass}`}>
+      <div className="flex items-start gap-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5" />
+          <span className="text-sm font-semibold uppercase tracking-wide">{role === "admin" ? "AI Overview" : role === "manager" ? "AI Team Summary" : "AI Summary"}</span>
+        </div>
+        <span className="ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/60 border">
+          {getHealthIcon(healthScore)} {healthLabel}
+        </span>
+      </div>
+      <h3 className="mt-3 font-display text-xl font-bold">{summary.headline}</h3>
+      <div className="mt-3 space-y-1.5 text-sm">
+        {"todayStatus" in summary && (
+          <p className="text-muted-foreground">{summary.todayStatus.statusLabel}</p>
+        )}
+        {"attendanceRateThisMonth" in summary && summary.attendanceRateThisMonth.narrative && (
+          <p>{summary.attendanceRateThisMonth.narrative}</p>
+        )}
+        {"leaveBalance" in summary && (
+          <p>{summary.leaveBalance.narrative}</p>
+        )}
+        {"faceVerification" in summary && (
+          <p>{summary.faceVerification.narrative}</p>
+        )}
+        {"pendingLeaves" in summary && (
+          <p>{summary.pendingLeaves.narrative}</p>
+        )}
+        {"myAlerts" in summary && summary.myAlerts.count > 0 && (
+          <p className="font-medium">{summary.myAlerts.narrative}</p>
+        )}
+        {"teamToday" in summary && (
+          <p>{summary.teamToday.narrative}</p>
+        )}
+        {"teamAttendanceTrend" in summary && summary.teamAttendanceTrend.narrative && (
+          <p>{summary.teamAttendanceTrend.narrative}</p>
+        )}
+        {"openExceptions" in summary && summary.openExceptions.count > 0 && (
+          <p>{summary.openExceptions.narrative}</p>
+        )}
+        {"alerts" in summary && summary.alerts.total > 0 && (
+          <p className={summary.alerts.critical > 0 ? "font-semibold text-red-700" : ""}>{summary.alerts.narrative}</p>
+        )}
+        {"queues" in summary && (
+          <p>{summary.queues.narrative}</p>
+        )}
+        {"mcExpiringSoon" in summary && summary.mcExpiringSoon.count > 0 && (
+          <p>{summary.mcExpiringSoon.narrative}</p>
+        )}
+        {"productivityOutliers" in summary && summary.productivityOutliers.count > 0 && (
+          <p>{summary.productivityOutliers.narrative}</p>
+        )}
+        {"topPriorityItems" in summary && summary.topPriorityItems.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {(summary.topPriorityItems as TopPriorityItem[]).slice(0, 3).map((item: TopPriorityItem, i: number) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className={`w-2 h-2 rounded-full ${item.severity === "critical" ? "bg-red-500" : item.severity === "high" ? "bg-amber-500" : "bg-yellow-400"}`} />
+                <span className="font-medium">{item.count} {item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user, hasRole } = useAuth();
   const isAdminHR = hasRole(ADMIN_HR_ROLES);
@@ -45,6 +155,8 @@ export default function Dashboard() {
   const today = new Date().toISOString().split("T")[0];
   const currentMonth = String(new Date().getMonth() + 1);
   const currentYear = String(new Date().getFullYear());
+  const currentYearNum = new Date().getFullYear();
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   const { data: usersData } = useListUsers({}, { query: { queryKey: ["dashboard", "users"], enabled: isAdminHR || isManager } });
   const { data: attendanceData } = useListAttendance({ startDate: today, endDate: today });
@@ -58,6 +170,81 @@ export default function Dashboard() {
     isSelfService ? { userId: user?.id, month: currentMonth, year: currentYear } : { month: currentMonth, year: currentYear },
     { query: { queryKey: ["dashboard", "productivity", user?.id], enabled: true } }
   );
+
+  // Worker-specific hooks
+  const { data: leaveBalance } = useGetLeaveBalance(
+    user?.id!,
+    { year: currentYearNum },
+    { query: { queryKey: ["dashboard", "leaveBalance", user?.id], enabled: !!user?.id } }
+  );
+  const { data: monthAttendanceSummary } = useGetAttendanceSummary(
+    { startDate: monthStart, endDate: today },
+    { query: { queryKey: ["dashboard", "monthAttendance", user?.id], enabled: !!user?.id } }
+  );
+  const { data: faceAttempts } = useListFaceVerificationAttemptsByUser(
+    user?.id!,
+    {},
+    { query: { queryKey: ["dashboard", "faceAttempts", user?.id], enabled: !!user?.id } }
+  );
+
+  // Manager/Admin shared hooks
+  const { data: teamExceptions } = useListAttendanceExceptions(
+    {},
+    { query: { queryKey: ["dashboard", "exceptions"], enabled: isManager || isAdminHR } }
+  );
+
+  // Worker: compute personal leave pending count
+  const myPendingLeaveCount = (leavesData?.leaves ?? []).filter(l => l.userId === user?.id && l.status === "pending").length;
+  const myPendingLeavesData = { leaves: (leavesData?.leaves ?? []).filter(l => l.userId === user?.id), total: myPendingLeaveCount };
+
+  const workerSummary = useMemo(() => {
+    if (!isSelfService) return null;
+    return computeWorkerSummary({
+      todayAttendance: attendanceData?.logs,
+      leaveBalance,
+      monthAttendanceSummary,
+      faceAttempts,
+      myPendingLeaves: myPendingLeavesData,
+      myAlerts: (alertsData?.alerts ?? []).filter(a => a.userId === user?.id),
+      userId: user?.id!,
+      productivityScores: productivityData,
+    });
+  }, [isSelfService, attendanceData, leaveBalance, monthAttendanceSummary, faceAttempts, myPendingLeaveCount, leavesData, user?.id, alertsData, productivityData]);
+
+  const managerSummary = useMemo(() => {
+    if (!isManager) return null;
+    const pendingLeaveCount = leavesData?.total ?? 0;
+    return computeManagerSummary({
+      todayAttendance: attendanceData?.logs,
+      teamExceptions,
+      teamAlerts: (alertsData?.alerts ?? []).filter(a => {
+        if (a.status === "resolved" || a.status === "dismissed") return false;
+        if (a.severity === "critical") return true;
+        return true;
+      }),
+      pendingLeaveCount,
+      productivityScores: productivityData,
+      totalUsers: usersData?.total ?? 0,
+    });
+  }, [isManager, attendanceData, teamExceptions, alertsData, leavesData, productivityData, usersData]);
+
+  const adminSummary = useMemo(() => {
+    if (!isAdminHR) return null;
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const openAlerts = (alertsData?.alerts ?? []).filter(a => a.status !== "resolved" && a.status !== "dismissed");
+    const overdueAlerts = openAlerts.filter(a => a.relatedDate && a.relatedDate < todayStr && a.status !== "resolved" && a.status !== "dismissed");
+    const mcExpiringSoon = openAlerts.filter(a => a.alertType === "mc_expiring_soon" || a.alertType === "mc_expired");
+    return computeAdminSummary({
+      openAlerts,
+      overdueAlerts,
+      criticalAlerts: openAlerts.filter(a => a.severity === "critical"),
+      pendingExceptions: teamExceptions,
+      pendingCertificates: certificatesData,
+      productivityScores: productivityData,
+      mcExpiringSoonAlerts: mcExpiringSoon,
+    });
+  }, [isAdminHR, alertsData, teamExceptions, certificatesData, productivityData]);
 
   const activeUsers = usersData?.users?.filter((u) => u.isActive === "true").length || 0;
   const presentToday = attendanceData?.logs?.filter((l) => l.status === "present").length || 0;
@@ -85,6 +272,9 @@ export default function Dashboard() {
             <StatCard title="Pending Leaves" value={pendingLeaves} icon={CalendarX} trend="Awaiting workflow review" trendUp={false} />
             <StatCard title="Pending MC Reviews" value={pendingCertificateReviews} icon={CheckSquare} trend="Compliance queue" trendUp={false} />
           </div>
+          {adminSummary && (
+            <AISummaryCard summary={adminSummary} role="admin" />
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-2 border-0 shadow-lg">
               <CardHeader>
@@ -142,6 +332,9 @@ export default function Dashboard() {
         </>
       ) : isManager ? (
         <>
+          {managerSummary && (
+            <AISummaryCard summary={managerSummary} role="manager" />
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <StatCard title="Present Today" value={presentToday} icon={Clock} trend="Operations pulse" trendUp={true} />
             <StatCard title="Pending Leaves" value={pendingLeaves} icon={CalendarX} trend="Awaiting review" trendUp={false} />
@@ -197,10 +390,29 @@ export default function Dashboard() {
         </>
       ) : (
         <>
+          {workerSummary && (
+            <AISummaryCard summary={workerSummary} role="worker" />
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <StatCard title="My Attendance Rate" value="98%" icon={TrendingUp} trend="Steady this month" trendUp={true} />
-            <StatCard title="Leaves Available" value="12 Days" icon={CalendarX} />
-            <StatCard title="Hours Logged (Week)" value="42 hrs" icon={Clock} />
+            <StatCard
+              title="My Attendance Rate"
+              value={workerSummary?.attendanceRateThisMonth.label ?? "—"}
+              icon={TrendingUp}
+              trend={workerSummary?.attendanceRateThisMonth.narrative ?? ""}
+              trendUp={workerSummary?.attendanceRateThisMonth?.value != null && workerSummary?.attendanceRateThisMonth?.value >= 85}
+            />
+            <StatCard
+              title="Annual Leave"
+              value={leaveBalance ? `${leaveBalance.annualLeaveRemaining ?? "—"} Days` : "—"}
+              icon={CalendarX}
+              trend={workerSummary?.leaveBalance.narrative ?? ""}
+            />
+            <StatCard
+              title="Hours This Month"
+              value={workerSummary?.hoursWorkedThisMonth?.value !== null && workerSummary?.hoursWorkedThisMonth?.value !== undefined ? `${Math.round(Number(workerSummary.hoursWorkedThisMonth.value))} hrs` : "—"}
+              icon={Clock}
+              trend={workerSummary?.hoursWorkedThisMonth.narrative ?? ""}
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
