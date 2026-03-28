@@ -1,10 +1,11 @@
 # Product Requirements Document (PRD)
 ## Workforce-AI-Insights → AI-Driven Workforce Operations Platform
 
-> **Implementation Status**: Phase 3 — Sprint A + Sprint B fully implemented & deployed (2026-03-29)
+> **Implementation Status**: Phase 3 — Sprint A + Sprint B + Sprint C (pagination + anomaly detection) fully implemented & deployed (2026-03-29)
 > - ✅ Sprint A: Dashboard AI summary cards for Worker, Manager, Admin/HR
 > - ✅ Sprint B: Productivity trend charts (recharts) on Dashboard and Productivity page
-> - ✅ UI/UX fixes: SSR-safe sidebar, skeleton loading, toast notifications
+> - ✅ Sprint C: Paginated views, skeleton loading, toast notifications, badge variants
+> - ✅ Anomaly Detection Engine: configurable thresholds, severity levels, `/api/anomalies` endpoint
 > - Phase 2 (Workflows) fully deployed
 
 ### Deployment Record (2026-03-29)
@@ -35,14 +36,27 @@
 
 ---
 
-**Deployment Record — Phase 3 (Sprint A + Sprint B + UI/UX fixes) (2026-03-29)**
+**Deployment Record — Phase 3 (Sprint C + Anomaly Detection) (2026-03-29)**
 
 | Component | Target | Status |
 |-----------|--------|--------|
-| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-COm9ISIC.js` |
-| **API** | Render (`teston-api`) — `deploy` branch | 🔄 GitHub push sent (commit `7db4e39`), auto-deploy in progress |
+| **Frontend** | Cloudflare Pages (`teston-hr-app`) | ✅ Live — `www.testonlandscape.online`, build `index-D_H3pxYR.js` |
+| **API** | Render (`teston-api`) — `deploy` branch | ✅ Live — commit `272251f` |
 
-**Phase 3 Sprint A changes:** AI summary card with role-specific health scores and narrative signals. No backend changes.
+**Phase 3 Sprint C changes:**
+- Paginated views on Leaves, Alerts, and Attendance pages (10 items/page)
+- Skeleton loading states during data fetches
+- Toast notifications wired to all mutation feedback
+- `success`/`warning` Badge variants added to Badge component
+- `core.tsx` consolidated to re-export from split component files
+
+**Anomaly Detection Engine:**
+- `artifacts/api-server/src/lib/anomalyDetection.ts` — configurable threshold-based detection
+- `GET /api/anomalies` — list anomalies with severity/type filtering
+- `POST /api/anomalies/detect` — trigger anomaly detection scan
+- Severity levels: `low`, `medium`, `high`, `critical`
+- Anomaly types: `attendance`, `leave`, `productivity`, `combined`
+- Auto-generated recommendations for each anomaly
 
 **Phase 3 Sprint B changes:** Recharts productivity trend charts on Dashboard and Productivity page.
 
