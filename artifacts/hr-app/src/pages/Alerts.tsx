@@ -1,3 +1,4 @@
+import { useToast } from "@/hooks/use-toast";
 import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListAlerts, useUpdateAlert, useListUsers } from "@workspace/api-client-react";
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/select";
 
 export default function Alerts() {
+  const { toast } = useToast();
   const { user, hasRole, hasPermission } = useAuth();
   const isOperational = hasRole(OPERATIONAL_ROLES);
   const isAdminHR = hasRole(ADMIN_HR_ROLES);
@@ -70,10 +72,14 @@ export default function Alerts() {
   const updateAlertMutation = useUpdateAlert({
     mutation: {
       onSuccess: () => {
+        toast({ title: "Success", description: "Alert updated successfully." });
         refetch();
         setSelectedAlert(null);
         setResolutionNotes("");
         setAssignToUserId("");
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to update alert. Please try again.", variant: "destructive" });
       },
     },
   });

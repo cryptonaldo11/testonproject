@@ -1,7 +1,9 @@
+import { useToast } from "@/hooks/use-toast";
 import React, { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListAttendance, useListUsers } from "@workspace/api-client-react";
 import { Card, Badge, Input, Button } from "@/components/ui/core";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { OPERATIONAL_ROLES, useAuth } from "@/lib/auth";
 import {
@@ -70,12 +72,12 @@ function getStatusBadge(status: AttendanceExceptionStatus) {
 }
 
 export default function Attendance() {
+  const { toast } = useToast();
   const { user, hasRole } = useAuth();
   const isOperational = hasRole(OPERATIONAL_ROLES);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [exceptions, setExceptions] = useState<AttendanceExceptionRecord[]>([]);
   const [exceptionsLoading, setExceptionsLoading] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [submitAttendanceLogId, setSubmitAttendanceLogId] = useState<number | null>(null);
   const [exceptionType, setExceptionType] = useState<AttendanceExceptionType>("manual_correction");
@@ -120,10 +122,7 @@ export default function Attendance() {
 
       setExceptions(payload.exceptions || []);
     } catch (error) {
-      setFeedback({
-        type: "error",
-        message: error instanceof Error ? error.message : "Failed to load attendance exceptions.",
-      });
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to load attendance exceptions.", variant: "destructive" });
     } finally {
       setExceptionsLoading(false);
     }
@@ -138,7 +137,6 @@ export default function Attendance() {
     : exceptions;
 
   const openSubmitDialog = (log?: { id: number; checkIn?: string | null; checkOut?: string | null }) => {
-    setFeedback(null);
     setSubmitAttendanceLogId(log?.id ?? null);
     setExceptionType(log?.checkIn && !log?.checkOut ? "missed_checkout" : "manual_correction");
     setExceptionReason("");
@@ -166,22 +164,18 @@ export default function Attendance() {
         throw new Error(payload?.error || "Failed to submit attendance exception.");
       }
 
-      setFeedback({ type: "success", message: "Attendance exception submitted successfully." });
+      toast({ title: "Success", description: "Attendance exception submitted successfully." });
       setIsSubmitDialogOpen(false);
       setExceptionReason("");
       await loadExceptions();
     } catch (error) {
-      setFeedback({
-        type: "error",
-        message: error instanceof Error ? error.message : "Failed to submit attendance exception.",
-      });
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to submit attendance exception.", variant: "destructive" });
     } finally {
       setIsSubmittingException(false);
     }
   };
 
   const openReviewDialog = (exception: AttendanceExceptionRecord) => {
-    setFeedback(null);
     setReviewTarget(exception);
     setReviewStatus(exception.status === "open" ? "under_review" : exception.status);
     setReviewNotes(exception.reviewNotes || "");
@@ -206,15 +200,12 @@ export default function Attendance() {
         throw new Error(payload?.error || "Failed to update attendance exception.");
       }
 
-      setFeedback({ type: "success", message: "Attendance exception updated." });
+      toast({ title: "Success", description: "Attendance exception updated." });
       setReviewTarget(null);
       setReviewNotes("");
       await loadExceptions();
     } catch (error) {
-      setFeedback({
-        type: "error",
-        message: error instanceof Error ? error.message : "Failed to update attendance exception.",
-      });
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to update attendance exception.", variant: "destructive" });
     } finally {
       setIsUpdatingException(false);
     }
@@ -241,18 +232,6 @@ export default function Attendance() {
           />
         </div>
       </div>
-
-      {feedback && (
-        <div
-          className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
-            feedback.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-destructive/20 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      )}
 
       <Card className="mb-6 border-0 shadow-lg">
         <div className="p-6 space-y-4">
@@ -323,7 +302,19 @@ export default function Attendance() {
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-4 w-12" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-6 w-24" /></td>
+                    </tr>
+                  ))}
+                </>
               ) : attendanceData?.logs?.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No records found for this date.</td></tr>
               ) : (

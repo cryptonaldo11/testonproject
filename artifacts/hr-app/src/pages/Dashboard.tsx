@@ -2,7 +2,8 @@ import React, { useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ADMIN_HR_ROLES, MANAGER_ROLES, SELF_SERVICE_ROLES, useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/core";
-import { Users, Clock, CalendarX, TrendingUp, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare, Sparkles } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Users, Clock, CalendarX, TrendingUp, TrendingDown, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare, Sparkles } from "lucide-react";
 import { useListUsers, useListAttendance, useListLeaves, useListAlerts, useListMedicalCertificates, useListProductivityScores, useGetLeaveBalance, useGetAttendanceSummary, useGetProductivityReport, useListAttendanceExceptions, useListFaceVerificationAttemptsByUser } from "@workspace/api-client-react";
 import {
   computeWorkerSummary,
@@ -12,6 +13,19 @@ import {
   type ManagerSummary,
   type AdminSummary,
 } from "@/lib/aiSummaryService";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  LineChart,
+  Line,
+} from "recharts";
+import type { ProductivityScoreResponse } from "@workspace/api-client-react";
 
 interface StatCardProps {
   title: string;
@@ -146,6 +160,372 @@ function AISummaryCard({ summary, role }: { summary: WorkerSummary | ManagerSumm
   );
 }
 
+// ─── Productivity Chart Components ───────────────────────────────────────────
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function getBarColor(score: number): string {
+  if (score >= 80) return "#22c55e"; // green-500
+  if (score >= 60) return "#f59e0b"; // amber-500
+  return "#ef4444"; // red-500
+}
+
+interface WorkerProductivityTrendProps {
+  scores: ProductivityScoreResponse[];
+  userId: number;
+}
+
+function WorkerProductivityTrend({ scores, userId }: WorkerProductivityTrendProps) {
+  const chartData = useMemo(() => {
+    // Filter to the worker's own scores and sort by year-month
+    const myScores = scores
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => {
+        const ma = new Date(Number(a.year), Number(a.month) - 1).getTime();
+        const mb = new Date(Number(b.year), Number(b.month) - 1).getTime();
+        return ma - mb;
+      })
+      .slice(-6);
+
+    return myScores.map((s) => ({
+      label: `${MONTH_SHORT[Number(s.month) - 1]}`,
+      score: Number(s.score),
+      fullLabel: `${MONTH_SHORT[Number(s.month) - 1]} ${s.year}`,
+    }));
+  }, [scores, userId]);
+
+  if (chartData.length === 0) {
+    return (
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Productivity Trend</CardTitle></CardHeader>
+        <CardContent><p className="text-sm text-muted-foreground">No productivity data available yet.</p></CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          Productivity Trend
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis dataKey="label" tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--background)",
+                border: "1px solid var(--border)",
+                borderRadius: "0.5rem",
+                padding: "0.5rem",
+                fontSize: "0.75rem",
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              }}
+              labelFormatter={(_label, payload) => {
+                const entry = payload?.[0]?.payload as typeof chartData[0] | undefined;
+                return entry?.fullLabel ?? "";
+              }}
+              formatter={(value: number) => [`${value}/100`, "Score"]}
+            />
+            <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={getBarColor(entry.score)} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ManagerTeamChartProps {
+  scores: ProductivityScoreResponse[];
+  userLabelMap: Map<number, string>;
+}
+
+function ManagerTeamProductivityChart({ scores, userLabelMap }: ManagerTeamChartProps) {
+  const chartData = useMemo(() => {
+    const latest = new Map<string, ProductivityScoreResponse>();
+    scores.forEach((s) => {
+      const key = `${s.userId}`;
+      const existing = latest.get(key);
+      if (!existing) {
+        latest.set(key, s);
+      } else {
+        const ek = new Date(Number(existing.year), Number(existing.month) - 1).getTime();
+        const sk = new Date(Number(s.year), Number(s.month) - 1).getTime();
+        if (sk > ek) latest.set(key, s);
+      }
+    });
+    return Array.from(latest.entries())
+      .map(([_, score]) => ({
+        name: userLabelMap.get(score.userId) ?? `User ${score.userId}`,
+        score: Number(score.score),
+        attendanceRate: Number(score.attendanceRate),
+      }))
+      .sort((a, b) => b.score - a.score);
+  }, [scores, userLabelMap]);
+
+  const avgScore =
+    chartData.length > 0
+      ? Math.round(chartData.reduce((sum, d) => sum + d.score, 0) / chartData.length)
+      : 0;
+
+  const avgData = chartData.map((d) => ({ name: d.name, avg: avgScore }));
+
+  if (chartData.length === 0) {
+    return (
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Team Productivity</CardTitle></CardHeader>
+        <CardContent><p className="text-sm text-muted-foreground">No team productivity data available yet.</p></CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          Team Productivity
+          <span className="ml-auto text-sm font-normal text-muted-foreground">
+            Avg: {avgScore}/100
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, className: "text-muted-foreground" }}
+              interval={0}
+              angle={-20}
+              textAnchor="end"
+              height={52}
+            />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--background)",
+                border: "1px solid var(--border)",
+                borderRadius: "0.5rem",
+                padding: "0.5rem",
+                fontSize: "0.75rem",
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              }}
+              formatter={(value: number, name: string) => {
+                if (name === "avg") return [`${value}/100`, "Team Avg"];
+                return [`${value}/100`, "Score"];
+              }}
+            />
+            <Bar dataKey="score" radius={[4, 4, 0, 0]} fill="#3b82f6" name="Score">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={getBarColor(entry.score)} />
+              ))}
+            </Bar>
+            <Line type="monotone" dataKey="avg" stroke="#94a3b8" strokeWidth={2} dot={false} name="Avg" />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface AdminProductivitySectionProps {
+  scores: ProductivityScoreResponse[];
+  userLabelMap: Map<number, string>;
+}
+
+function AdminProductivitySection({ scores, userLabelMap }: AdminProductivitySectionProps) {
+  const distributionData = useMemo(() => {
+    let low = 0, mid = 0, high = 0;
+    scores.forEach((s) => {
+      const score = Number(s.score);
+      if (score >= 80) high++;
+      else if (score >= 60) mid++;
+      else low++;
+    });
+    return [
+      { label: "0–59", labelFull: "At Risk (< 60)", count: low, fill: "#ef4444" },
+      { label: "60–79", labelFull: "Needs Attention (60–79)", count: mid, fill: "#f59e0b" },
+      { label: "80–100", labelFull: "Good (80+)", count: high, fill: "#22c55e" },
+    ];
+  }, [scores]);
+
+  const ranked = useMemo(() => {
+    return [...scores]
+      .map((s) => ({ ...s, numericScore: Number(s.score), label: userLabelMap.get(s.userId) ?? `User ${s.userId}` }))
+      .sort((a, b) => b.numericScore - a.numericScore);
+  }, [scores, userLabelMap]);
+
+  const top5 = ranked.slice(0, 5);
+  const bottom5 = ranked.slice(-5).reverse();
+
+  const totalEmployees = scores.length;
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((sum, s) => sum + Number(s.score), 0) / scores.length)
+    : 0;
+
+  return (
+    <div className="space-y-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Distribution Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Score Distribution
+              <span className="ml-auto text-sm font-normal text-muted-foreground">
+                {totalEmployees} employees
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={distributionData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="label" tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "0.5rem",
+                    padding: "0.5rem",
+                    fontSize: "0.75rem",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  labelFormatter={(_label, payload) => {
+                    const entry = payload?.[0]?.payload as typeof distributionData[0] | undefined;
+                    return entry?.labelFull ?? "";
+                  }}
+                  formatter={(value: number) => [`${value} employees`, "Count"]}
+                />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {distributionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Summary stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Workforce Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl border bg-muted/30 p-4 text-center">
+                <p className="text-3xl font-display font-bold">{avgScore}</p>
+                <p className="text-xs text-muted-foreground mt-1">Avg Score /100</p>
+              </div>
+              <div className="rounded-xl border bg-muted/30 p-4 text-center">
+                <p className="text-3xl font-display font-bold">{totalEmployees}</p>
+                <p className="text-xs text-muted-foreground mt-1">Employees Scored</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+                <p className="text-2xl font-display font-bold text-emerald-600">{distributionData[2].count}</p>
+                <p className="text-xs text-emerald-700 mt-1">Good (80+)</p>
+              </div>
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
+                <p className="text-2xl font-display font-bold text-red-600">{distributionData[0].count}</p>
+                <p className="text-xs text-red-700 mt-1">At Risk (&lt;60)</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top and Bottom performers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              Top 5 Performers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {top5.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No data yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {top5.map((entry, i) => (
+                  <div key={entry.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm font-medium">{entry.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                        {entry.numericScore}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+              Bottom 5 Performers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bottom5.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No data yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {bottom5.map((entry, i) => {
+                  const colorClass =
+                    entry.numericScore < 60
+                      ? "bg-red-100 text-red-700"
+                      : "bg-amber-100 text-amber-700";
+                  return (
+                    <div key={entry.id} className="flex items-center justify-between rounded-lg border p-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                          {ranked.length - i}
+                        </span>
+                        <span className="text-sm font-medium">{entry.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${colorClass}`}>
+                          {entry.numericScore}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user, hasRole } = useAuth();
   const isAdminHR = hasRole(ADMIN_HR_ROLES);
@@ -158,17 +538,28 @@ export default function Dashboard() {
   const currentYearNum = new Date().getFullYear();
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
-  const { data: usersData } = useListUsers({}, { query: { queryKey: ["dashboard", "users"], enabled: isAdminHR || isManager } });
-  const { data: attendanceData } = useListAttendance({ startDate: today, endDate: today });
-  const { data: leavesData } = useListLeaves({ status: "pending" }, { query: { queryKey: ["dashboard", "leaves"], enabled: isAdminHR || isManager } });
+  const { data: usersData, isLoading: usersLoading } = useListUsers({}, { query: { queryKey: ["dashboard", "users"], enabled: isAdminHR || isManager } });
+  const { data: attendanceData, isLoading: attendanceLoading } = useListAttendance({ startDate: today, endDate: today });
+  const { data: leavesData, isLoading: leavesLoading } = useListLeaves({ status: "pending" }, { query: { queryKey: ["dashboard", "leaves"], enabled: isAdminHR || isManager } });
   const { data: alertsData } = useListAlerts({}, { query: { queryKey: ["dashboard", "alerts"], enabled: true } });
   const { data: certificatesData } = useListMedicalCertificates(
     { verificationStatus: "pending" },
     { query: { queryKey: ["dashboard", "medical-certificates", "pending"], enabled: isAdminHR } }
   );
-  const { data: productivityData } = useListProductivityScores(
+  const { data: productivityData, isLoading: productivityLoading } = useListProductivityScores(
     isSelfService ? { userId: user?.id, month: currentMonth, year: currentYear } : { month: currentMonth, year: currentYear },
     { query: { queryKey: ["dashboard", "productivity", user?.id], enabled: true } }
+  );
+
+  // Worker trend: fetch all productivity scores for the current user (to show 6-month trend)
+  const { data: trendData } = useListProductivityScores(
+    { userId: user?.id },
+    {
+      query: {
+        queryKey: ["dashboard", "productivity", "trend", user?.id],
+        enabled: isSelfService && !!user?.id,
+      },
+    }
   );
 
   // Worker-specific hooks
@@ -256,6 +647,13 @@ export default function Dashboard() {
   const productivityAverage = productivityData?.scores?.length
     ? Math.round(productivityData.scores.reduce((sum, item) => sum + Number(item.score), 0) / productivityData.scores.length)
     : 0;
+  const userLabelMap = useMemo(() => {
+    const map = new Map<number, string>();
+    usersData?.users?.forEach((u) => {
+      map.set(u.id, u.name ?? `User ${u.id}`);
+    });
+    return map;
+  }, [usersData?.users]);
 
   return (
     <DashboardLayout>
@@ -266,12 +664,21 @@ export default function Dashboard() {
 
       {isAdminHR ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard title="Total Active Employees" value={activeUsers} icon={Users} trend="Across the current workforce" trendUp={true} />
-            <StatCard title="Present Today" value={presentToday} icon={Clock} trend="Live attendance snapshot" trendUp={true} />
-            <StatCard title="Pending Leaves" value={pendingLeaves} icon={CalendarX} trend="Awaiting workflow review" trendUp={false} />
-            <StatCard title="Pending MC Reviews" value={pendingCertificateReviews} icon={CheckSquare} trend="Compliance queue" trendUp={false} />
-          </div>
+          {usersLoading || attendanceLoading || leavesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <StatCard title="Total Active Employees" value={activeUsers} icon={Users} trend="Across the current workforce" trendUp={true} />
+              <StatCard title="Present Today" value={presentToday} icon={Clock} trend="Live attendance snapshot" trendUp={true} />
+              <StatCard title="Pending Leaves" value={pendingLeaves} icon={CalendarX} trend="Awaiting workflow review" trendUp={false} />
+              <StatCard title="Pending MC Reviews" value={pendingCertificateReviews} icon={CheckSquare} trend="Compliance queue" trendUp={false} />
+            </div>
+          )}
+          {adminSummary && (
+            <AdminProductivitySection scores={productivityData?.scores ?? []} userLabelMap={userLabelMap} />
+          )}
           {adminSummary && (
             <AISummaryCard summary={adminSummary} role="admin" />
           )}
@@ -333,14 +740,23 @@ export default function Dashboard() {
       ) : isManager ? (
         <>
           {managerSummary && (
+            <ManagerTeamProductivityChart scores={productivityData?.scores ?? []} userLabelMap={userLabelMap} />
+          )}
+          {managerSummary && (
             <AISummaryCard summary={managerSummary} role="manager" />
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard title="Present Today" value={presentToday} icon={Clock} trend="Operations pulse" trendUp={true} />
-            <StatCard title="Pending Leaves" value={pendingLeaves} icon={CalendarX} trend="Awaiting review" trendUp={false} />
-            <StatCard title="Assigned Alerts" value={assignedAlerts} icon={AlertTriangle} trend="My workflow queue" trendUp={false} />
-            <StatCard title="Critical Alerts" value={unresolvedCriticalAlerts} icon={ShieldAlert} trend="Needs escalation" trendUp={false} />
-          </div>
+          {usersLoading || attendanceLoading || leavesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <StatCard title="Present Today" value={presentToday} icon={Clock} trend="Operations pulse" trendUp={true} />
+              <StatCard title="Pending Leaves" value={pendingLeaves} icon={CalendarX} trend="Awaiting review" trendUp={false} />
+              <StatCard title="Assigned Alerts" value={assignedAlerts} icon={AlertTriangle} trend="My workflow queue" trendUp={false} />
+              <StatCard title="Critical Alerts" value={unresolvedCriticalAlerts} icon={ShieldAlert} trend="Needs escalation" trendUp={false} />
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-2 border-0 shadow-lg">
               <CardHeader>
@@ -391,29 +807,38 @@ export default function Dashboard() {
       ) : (
         <>
           {workerSummary && (
+            <WorkerProductivityTrend scores={trendData?.scores ?? []} userId={user?.id!} />
+          )}
+          {workerSummary && (
             <AISummaryCard summary={workerSummary} role="worker" />
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <StatCard
-              title="My Attendance Rate"
-              value={workerSummary?.attendanceRateThisMonth.label ?? "—"}
-              icon={TrendingUp}
-              trend={workerSummary?.attendanceRateThisMonth.narrative ?? ""}
-              trendUp={workerSummary?.attendanceRateThisMonth?.value != null && workerSummary?.attendanceRateThisMonth?.value >= 85}
-            />
-            <StatCard
-              title="Annual Leave"
-              value={leaveBalance ? `${leaveBalance.annualLeaveRemaining ?? "—"} Days` : "—"}
-              icon={CalendarX}
-              trend={workerSummary?.leaveBalance.narrative ?? ""}
-            />
-            <StatCard
-              title="Hours This Month"
-              value={workerSummary?.hoursWorkedThisMonth?.value !== null && workerSummary?.hoursWorkedThisMonth?.value !== undefined ? `${Math.round(Number(workerSummary.hoursWorkedThisMonth.value))} hrs` : "—"}
-              icon={Clock}
-              trend={workerSummary?.hoursWorkedThisMonth.narrative ?? ""}
-            />
-          </div>
+          {attendanceLoading || productivityLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <StatCard
+                title="My Attendance Rate"
+                value={workerSummary?.attendanceRateThisMonth.label ?? "—"}
+                icon={TrendingUp}
+                trend={workerSummary?.attendanceRateThisMonth.narrative ?? ""}
+                trendUp={workerSummary?.attendanceRateThisMonth?.value != null && workerSummary?.attendanceRateThisMonth?.value >= 85}
+              />
+              <StatCard
+                title="Annual Leave"
+                value={leaveBalance ? `${leaveBalance.annualLeaveRemaining ?? "—"} Days` : "—"}
+                icon={CalendarX}
+                trend={workerSummary?.leaveBalance.narrative ?? ""}
+              />
+              <StatCard
+                title="Hours This Month"
+                value={workerSummary?.hoursWorkedThisMonth?.value !== null && workerSummary?.hoursWorkedThisMonth?.value !== undefined ? `${Math.round(Number(workerSummary.hoursWorkedThisMonth.value))} hrs` : "—"}
+                icon={Clock}
+                trend={workerSummary?.hoursWorkedThisMonth.narrative ?? ""}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-2 border-0 shadow-lg">

@@ -9,7 +9,7 @@ import {
   useListUsers,
 } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button, Card, Input, Label, Badge } from "@/components/ui/core";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge } from "@/components/ui/core";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +48,19 @@ import {
   RotateCw,
   Building2,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  LineChart,
+  Line,
+  Legend,
+} from "recharts";
 import { ADMIN_HR_ROLES, OPERATIONAL_ROLES, useAuth } from "@/lib/auth";
 
 type ScoreCard = {
@@ -223,6 +236,189 @@ function exportDetailReportToCsv(
   URL.revokeObjectURL(url);
 }
 
+// ─── Chart Components ─────────────────────────────────────────────────────────
+
+const MONTH_SHORT_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function getChartBarColor(score: number): string {
+  if (score >= 80) return "#22c55e"; // green-500
+  if (score >= 60) return "#f59e0b"; // amber-500
+  return "#ef4444"; // red-500
+}
+
+interface ProductivityTrendChartProps {
+  allUserScores: ScoreCard[];
+}
+
+function ProductivityTrendChart({ allUserScores }: ProductivityTrendChartProps) {
+  const chartData = useMemo(() => {
+    return [...allUserScores]
+      .sort((a, b) => {
+        const ta = new Date(Number(a.year), Number(a.month) - 1).getTime();
+        const tb = new Date(Number(b.year), Number(b.month) - 1).getTime();
+        return ta - tb;
+      })
+      .slice(-12)
+      .map((s) => ({
+        label: `${MONTH_SHORT_NAMES[Number(s.month) - 1]} ${s.year.slice(2)}`,
+        fullLabel: `${MONTH_SHORT_NAMES[Number(s.month) - 1]} ${s.year}`,
+        score: Number(s.score),
+        attendanceRate: Number(s.attendanceRate),
+        punctualityRate: Number(s.punctualityRate),
+      }));
+  }, [allUserScores]);
+
+  if (chartData.length < 2) {
+    return null;
+  }
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          My Productivity Trend
+          <span className="ml-auto text-sm font-normal text-muted-foreground">
+            Last {chartData.length} months
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={chartData} margin={{ top: 4, right: 24, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, className: "text-muted-foreground" }} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--background)",
+                border: "1px solid var(--border)",
+                borderRadius: "0.5rem",
+                padding: "0.5rem",
+                fontSize: "0.75rem",
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              }}
+              labelFormatter={(_label, payload) => {
+                const entry = payload?.[0]?.payload as typeof chartData[0] | undefined;
+                return entry?.fullLabel ?? "";
+              }}
+              formatter={(value: number, name: string) => {
+                if (name === "score") return [`${value}/100`, "Overall Score"];
+                if (name === "attendanceRate") return [`${value}%`, "Attendance"];
+                if (name === "punctualityRate") return [`${value}%`, "Punctuality"];
+                return [String(value), name];
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: "0.75rem" }} />
+            <Line
+              type="monotone"
+              dataKey="score"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dot={{ fill: "#3b82f6", r: 3 }}
+              activeDot={{ r: 5 }}
+              name="Overall Score"
+            />
+            <Line
+              type="monotone"
+              dataKey="attendanceRate"
+              stroke="#22c55e"
+              strokeWidth={1.5}
+              dot={false}
+              name="Attendance"
+            />
+            <Line
+              type="monotone"
+              dataKey="punctualityRate"
+              stroke="#f59e0b"
+              strokeWidth={1.5}
+              dot={false}
+              name="Punctuality"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface TeamScoreBarChartProps {
+  scores: ScoreCard[];
+  userLabelMap: Map<number, string>;
+  selectedMonth: string;
+  selectedYear: string;
+}
+
+function TeamScoreBarChart({ scores, userLabelMap, selectedMonth, selectedYear }: TeamScoreBarChartProps) {
+  const chartData = useMemo(() => {
+    const latest = new Map<number, ScoreCard>();
+    scores.forEach((s) => {
+      const existing = latest.get(s.userId);
+      if (!existing) {
+        latest.set(s.userId, s);
+      } else {
+        const et = new Date(Number(existing.year), Number(existing.month) - 1).getTime();
+        const st = new Date(Number(s.year), Number(s.month) - 1).getTime();
+        if (st > et) latest.set(s.userId, s);
+      }
+    });
+    return Array.from(latest.values())
+      .map((s) => ({
+        name: userLabelMap.get(s.userId) ?? `User ${s.userId}`,
+        score: Number(s.score),
+      }))
+      .sort((a, b) => b.score - a.score);
+  }, [scores, userLabelMap]);
+
+  if (chartData.length === 0) return null;
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          Team Scores — {monthLabel(selectedMonth)} {selectedYear}
+          <span className="ml-auto text-sm font-normal text-muted-foreground">
+            {chartData.length} employees
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, className: "text-muted-foreground" }}
+              interval={0}
+              angle={-20}
+              textAnchor="end"
+              height={52}
+            />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 12, className: "text-muted-foreground" }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--background)",
+                border: "1px solid var(--border)",
+                borderRadius: "0.5rem",
+                padding: "0.5rem",
+                fontSize: "0.75rem",
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              }}
+              formatter={(value: number) => [`${value}/100`, "Score"]}
+            />
+            <Bar dataKey="score" radius={[4, 4, 0, 0]} name="Score">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={getChartBarColor(entry.score)} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Productivity() {
   const { user, hasRole } = useAuth();
   const isOperational = hasRole(OPERATIONAL_ROLES);
@@ -264,6 +460,17 @@ export default function Productivity() {
       enabled: isOperational,
     },
   });
+
+  // Fetch all scores for the current user to build the trend chart
+  const { data: allUserScoresData } = useListProductivityScores(
+    { userId: user?.id },
+    {
+      query: {
+        queryKey: ["productivity", "all-user-scores", user?.id],
+        enabled: !!user?.id,
+      },
+    }
+  );
 
   const visibleScores = scoreData?.scores ?? [];
   const previousScores = previousScoreData?.scores ?? [];
@@ -653,6 +860,12 @@ export default function Productivity() {
           </div>
         </div>
       </Card>
+
+      <ProductivityTrendChart allUserScores={(allUserScoresData?.scores ?? []) as ScoreCard[]} />
+
+      {isOperational && (
+        <TeamScoreBarChart scores={displayedScores as ScoreCard[]} userLabelMap={userLabelMap} selectedMonth={selectedMonth} selectedYear={selectedYear} />
+      )}
 
       {isLoading ? (
         <Card className="p-8">

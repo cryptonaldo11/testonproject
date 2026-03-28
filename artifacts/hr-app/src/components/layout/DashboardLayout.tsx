@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ADMIN_HR_ROLES,
@@ -27,6 +27,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, logout, hasRole, hasPermission } = useAuth();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!user) return null;
 
@@ -63,7 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       <AnimatePresence>
-        {(sidebarOpen || window.innerWidth >= 768) && (
+        {(sidebarOpen || (mounted && window.innerWidth >= 768)) && (
           <motion.aside
             initial={{ x: -300 }}
             animate={{ x: 0 }}

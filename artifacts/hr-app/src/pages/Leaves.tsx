@@ -2,6 +2,8 @@ import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListLeaves, useCreateLeave, useListUsers, useUpdateLeave } from "@workspace/api-client-react";
 import { Card, Badge, Button, Input, Label } from "@/components/ui/core";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -38,16 +40,29 @@ function normalizeReason(reason: string): string {
   return reason.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function skeletonRow(isAdminHR: boolean) {
+  return (
+    <tr>
+      <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+      <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+      <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+      <td className="px-6 py-4"><Skeleton className="h-4 w-48" /></td>
+      <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+      {isAdminHR && <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>}
+    </tr>
+  );
+}
+
 export default function Leaves() {
+  const { toast } = useToast();
   const { user, hasRole } = useAuth();
   const isOperational = hasRole(OPERATIONAL_ROLES);
   const isAdminHR = hasRole(ADMIN_HR_ROLES);
   const [isApplying, setIsApplying] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [reviewTarget, setReviewTarget] = useState<{ id: number; action: "approved" | "rejected" } | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
 
-  const { data: leavesData, refetch } = useListLeaves(
+  const { data: leavesData, isLoading: leavesLoading, refetch } = useListLeaves(
     isOperational ? {} : { userId: user?.id },
   );
   const { data: usersData } = useListUsers(undefined, {
@@ -111,31 +126,30 @@ export default function Leaves() {
     mutation: {
       onSuccess: () => {
         setIsApplying(false);
-        setFeedback({ type: "success", message: "Leave application submitted successfully." });
+        toast({ title: "Success", description: "Leave application submitted successfully." });
         refetch();
       },
       onError: (err: Error & { response?: { data?: { error?: string } } }) => {
-        setFeedback({ type: "error", message: err?.response?.data?.error || "Failed to submit leave application." });
+        toast({ title: "Error", description: err?.response?.data?.error || "Failed to submit leave application. Please try again.", variant: "destructive" });
       },
     },
   });
   const updateLeaveMutation = useUpdateLeave({
     mutation: {
       onSuccess: () => {
-        setFeedback({ type: "success", message: "Leave status updated successfully." });
+        toast({ title: "Success", description: "Leave status updated successfully." });
         setReviewTarget(null);
         setReviewNotes("");
         refetch();
       },
       onError: (err: Error & { response?: { data?: { error?: string } } }) => {
-        setFeedback({ type: "error", message: err?.response?.data?.error || "Failed to update leave status." });
+        toast({ title: "Error", description: err?.response?.data?.error || "Failed to update leave status. Please try again.", variant: "destructive" });
       },
     },
   });
 
   const handleApply = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFeedback(null);
     const fd = new FormData(e.currentTarget);
     const startDate = fd.get("startDate") as string;
     const endDate = fd.get("endDate") as string;
@@ -143,7 +157,7 @@ export default function Leaves() {
     if (!user?.id) return;
 
     if (startDate > endDate) {
-      setFeedback({ type: "error", message: "End date must be on or after the start date." });
+      toast({ title: "Invalid dates", description: "End date must be on or after the start date.", variant: "destructive" });
       return;
     }
 
@@ -159,7 +173,6 @@ export default function Leaves() {
   };
 
   const openReviewDialog = (id: number, action: "approved" | "rejected") => {
-    setFeedback(null);
     setReviewTarget({ id, action });
     setReviewNotes("");
   };
@@ -188,18 +201,6 @@ export default function Leaves() {
           </Button>
         )}
       </div>
-
-      {feedback && (
-        <div
-          className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
-            feedback.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-destructive/20 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      )}
 
       {isAdminHR && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -279,62 +280,64 @@ export default function Leaves() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {leavesData?.leaves?.map((leave) => (
-                <tr key={leave.id} className="hover:bg-accent/20 transition-colors align-top">
-                  <td className="px-6 py-4 font-medium">{getEmployeeLabel(leave.userId)}</td>
-                  <td className="px-6 py-4 capitalize font-semibold text-primary">{leave.leaveType}</td>
-                  <td className="px-6 py-4 text-muted-foreground">
-                    {formatDate(leave.startDate)} <br />to {formatDate(leave.endDate)}
-                    <span className="block mt-1 text-xs font-semibold text-foreground">{leave.totalDays} Days</span>
-                  </td>
-                  <td className="px-6 py-4 max-w-[240px]">
-                    <div className="truncate" title={leave.reason}>{leave.reason}</div>
-                    {isAdminHR && (leave.aiClassification || leave.aiConfidence) && (
-                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                        <p>
-                          AI suggestion: <span className="font-medium capitalize">{leave.aiClassification || "unclassified"}</span>
-                          {leave.aiConfidence ? ` • Confidence ${Math.round(Number(leave.aiConfidence) * 100)}%` : ""}
-                        </p>
-                        {hasStrongMismatch(leave.leaveType, leave.aiClassification, leave.aiConfidence) && (
-                          <p className="text-amber-700 font-medium">Possible mismatch: selected leave type may not match the reason text.</p>
-                        )}
-                        {leave.aiClassification === "unclassified" && (
-                          <p className="text-muted-foreground">Low-confidence AI suggestion. HR review recommended.</p>
-                        )}
-                      </div>
-                    )}
-                    {leave.reviewNotes && (
-                      <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">Review note: {leave.reviewNotes}</p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge
-                      variant={
-                        leave.status === "approved"
-                          ? "success"
-                          : leave.status === "rejected"
-                            ? "destructive"
-                            : leave.status === "pending"
-                              ? "warning"
-                              : "secondary"
-                      }
-                      className="capitalize"
-                    >
-                      {leave.status}
-                    </Badge>
-                  </td>
-                  {isAdminHR && (
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {leave.status === "pending" && (
-                        <>
-                          <Button size="sm" variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => openReviewDialog(leave.id, "approved")}>Approve</Button>
-                          <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={() => openReviewDialog(leave.id, "rejected")}>Reject</Button>
-                        </>
+              {leavesLoading
+                ? [...Array(5)].map((_, i) => skeletonRow(isAdminHR))
+                : leavesData?.leaves?.map((leave) => (
+                  <tr key={leave.id} className="hover:bg-accent/20 transition-colors align-top">
+                    <td className="px-6 py-4 font-medium">{getEmployeeLabel(leave.userId)}</td>
+                    <td className="px-6 py-4 capitalize font-semibold text-primary">{leave.leaveType}</td>
+                    <td className="px-6 py-4 text-muted-foreground">
+                      {formatDate(leave.startDate)} <br />to {formatDate(leave.endDate)}
+                      <span className="block mt-1 text-xs font-semibold text-foreground">{leave.totalDays} Days</span>
+                    </td>
+                    <td className="px-6 py-4 max-w-[240px]">
+                      <div className="truncate" title={leave.reason}>{leave.reason}</div>
+                      {isAdminHR && (leave.aiClassification || leave.aiConfidence) && (
+                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                          <p>
+                            AI suggestion: <span className="font-medium capitalize">{leave.aiClassification || "unclassified"}</span>
+                            {leave.aiConfidence ? ` • Confidence ${Math.round(Number(leave.aiConfidence) * 100)}%` : ""}
+                          </p>
+                          {hasStrongMismatch(leave.leaveType, leave.aiClassification, leave.aiConfidence) && (
+                            <p className="text-amber-700 font-medium">Possible mismatch: selected leave type may not match the reason text.</p>
+                          )}
+                          {leave.aiClassification === "unclassified" && (
+                            <p className="text-muted-foreground">Low-confidence AI suggestion. HR review recommended.</p>
+                          )}
+                        </div>
+                      )}
+                      {leave.reviewNotes && (
+                        <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">Review note: {leave.reviewNotes}</p>
                       )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-6 py-4">
+                      <Badge
+                        variant={
+                          leave.status === "approved"
+                            ? "success"
+                            : leave.status === "rejected"
+                              ? "destructive"
+                              : leave.status === "pending"
+                                ? "warning"
+                                : "secondary"
+                        }
+                        className="capitalize"
+                      >
+                        {leave.status}
+                      </Badge>
+                    </td>
+                    {isAdminHR && (
+                      <td className="px-6 py-4 text-right space-x-2">
+                        {leave.status === "pending" && (
+                          <>
+                            <Button size="sm" variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => openReviewDialog(leave.id, "approved")}>Approve</Button>
+                            <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={() => openReviewDialog(leave.id, "rejected")}>Reject</Button>
+                          </>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
