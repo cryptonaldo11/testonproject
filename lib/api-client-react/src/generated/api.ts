@@ -19,15 +19,25 @@ import type {
 import type {
   AlertListResponse,
   AlertResponse,
+  AttendanceExceptionListResponse,
+  AttendanceExceptionResponse,
   AttendanceListResponse,
   AttendanceResponse,
   AttendanceSummaryResponse,
   AuthResponse,
+  CalculateAllProductivityRequest,
+  CalculateAllProductivityResponse,
+  CalculateProductivityRequest,
+  CalculateProductivityResponse,
   CheckInRequest,
+  CheckMcExpiryBody,
+  CheckMcExpiryResponse,
   CheckOutRequest,
   CreateAlertRequest,
+  CreateAttendanceExceptionRequest,
   CreateAttendanceRequest,
   CreateDepartmentRequest,
+  CreateFaceVerificationAttemptRequest,
   CreateLeaveRequest,
   CreateMedicalCertificateRequest,
   CreateRoleRequest,
@@ -37,14 +47,20 @@ import type {
   DepartmentResponse,
   ErrorResponse,
   FaceDescriptorResponse,
+  FaceVerificationAttemptListResponse,
+  FaceVerificationAttemptResponse,
   GetAttendanceSummaryParams,
   GetLeaveBalanceParams,
+  GetProductivityReportParams,
   HealthStatus,
   LeaveBalanceResponse,
   LeaveListResponse,
   LeaveResponse,
   ListAlertsParams,
+  ListAttendanceExceptionsParams,
   ListAttendanceParams,
+  ListFaceVerificationAttemptsByUserParams,
+  ListFaceVerificationAttemptsParams,
   ListLeavesParams,
   ListMedicalCertificatesParams,
   ListProductivityScoresParams,
@@ -55,12 +71,15 @@ import type {
   MedicalCertificateResponse,
   MessageResponse,
   ProductivityListResponse,
+  ProductivityReportResponse,
   RegisterFaceRequest,
   RoleListResponse,
   RoleResponse,
   UpdateAlertRequest,
+  UpdateAttendanceExceptionRequest,
   UpdateAttendanceRequest,
   UpdateDepartmentRequest,
+  UpdateFaceVerificationAttemptRequest,
   UpdateLeaveRequest,
   UpdateMedicalCertificateRequest,
   UpdateUserRequest,
@@ -2623,6 +2642,93 @@ export const useUpdateMedicalCertificate = <
 };
 
 /**
+ * Scans all certificates with mcEndDate within the specified window that have not yet received a reminder. Creates mc_expiring_soon or mc_expired alerts and stamps reminderSentAt. Intended for cron/scheduled invocation.
+ * @summary Scan medical certificates and create expiry reminder alerts
+ */
+export const getCheckMcExpiryUrl = () => {
+  return `/api/medical-certificates/check-expiry`;
+};
+
+export const checkMcExpiry = async (
+  checkMcExpiryBody?: CheckMcExpiryBody,
+  options?: RequestInit,
+): Promise<CheckMcExpiryResponse> => {
+  return customFetch<CheckMcExpiryResponse>(getCheckMcExpiryUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(checkMcExpiryBody),
+  });
+};
+
+export const getCheckMcExpiryMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkMcExpiry>>,
+    TError,
+    { data: BodyType<CheckMcExpiryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkMcExpiry>>,
+  TError,
+  { data: BodyType<CheckMcExpiryBody> },
+  TContext
+> => {
+  const mutationKey = ["checkMcExpiry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkMcExpiry>>,
+    { data: BodyType<CheckMcExpiryBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return checkMcExpiry(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CheckMcExpiryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof checkMcExpiry>>
+>;
+export type CheckMcExpiryMutationBody = BodyType<CheckMcExpiryBody>;
+export type CheckMcExpiryMutationError = ErrorType<ErrorResponse | void>;
+
+/**
+ * @summary Scan medical certificates and create expiry reminder alerts
+ */
+export const useCheckMcExpiry = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkMcExpiry>>,
+    TError,
+    { data: BodyType<CheckMcExpiryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof checkMcExpiry>>,
+  TError,
+  { data: BodyType<CheckMcExpiryBody> },
+  TContext
+> => {
+  return useMutation(getCheckMcExpiryMutationOptions(options));
+};
+
+/**
  * @summary List alerts
  */
 export const getListAlertsUrl = (params?: ListAlertsParams) => {
@@ -2890,6 +2996,887 @@ export const useUpdateAlert = <
 };
 
 /**
+ * @summary List attendance exceptions
+ */
+export const getListAttendanceExceptionsUrl = (
+  params?: ListAttendanceExceptionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/attendance-exceptions?${stringifiedParams}`
+    : `/api/attendance-exceptions`;
+};
+
+export const listAttendanceExceptions = async (
+  params?: ListAttendanceExceptionsParams,
+  options?: RequestInit,
+): Promise<AttendanceExceptionListResponse> => {
+  return customFetch<AttendanceExceptionListResponse>(
+    getListAttendanceExceptionsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListAttendanceExceptionsQueryKey = (
+  params?: ListAttendanceExceptionsParams,
+) => {
+  return [`/api/attendance-exceptions`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAttendanceExceptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAttendanceExceptions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAttendanceExceptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAttendanceExceptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListAttendanceExceptionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAttendanceExceptions>>
+  > = ({ signal }) =>
+    listAttendanceExceptions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAttendanceExceptions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAttendanceExceptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAttendanceExceptions>>
+>;
+export type ListAttendanceExceptionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List attendance exceptions
+ */
+
+export function useListAttendanceExceptions<
+  TData = Awaited<ReturnType<typeof listAttendanceExceptions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListAttendanceExceptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAttendanceExceptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAttendanceExceptionsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Submit an attendance exception
+ */
+export const getCreateAttendanceExceptionUrl = () => {
+  return `/api/attendance-exceptions`;
+};
+
+export const createAttendanceException = async (
+  createAttendanceExceptionRequest: CreateAttendanceExceptionRequest,
+  options?: RequestInit,
+): Promise<AttendanceExceptionResponse> => {
+  return customFetch<AttendanceExceptionResponse>(
+    getCreateAttendanceExceptionUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createAttendanceExceptionRequest),
+    },
+  );
+};
+
+export const getCreateAttendanceExceptionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAttendanceException>>,
+    TError,
+    { data: BodyType<CreateAttendanceExceptionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAttendanceException>>,
+  TError,
+  { data: BodyType<CreateAttendanceExceptionRequest> },
+  TContext
+> => {
+  const mutationKey = ["createAttendanceException"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAttendanceException>>,
+    { data: BodyType<CreateAttendanceExceptionRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAttendanceException(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAttendanceExceptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAttendanceException>>
+>;
+export type CreateAttendanceExceptionMutationBody =
+  BodyType<CreateAttendanceExceptionRequest>;
+export type CreateAttendanceExceptionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit an attendance exception
+ */
+export const useCreateAttendanceException = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAttendanceException>>,
+    TError,
+    { data: BodyType<CreateAttendanceExceptionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAttendanceException>>,
+  TError,
+  { data: BodyType<CreateAttendanceExceptionRequest> },
+  TContext
+> => {
+  return useMutation(getCreateAttendanceExceptionMutationOptions(options));
+};
+
+/**
+ * @summary Get an attendance exception
+ */
+export const getGetAttendanceExceptionUrl = (id: number) => {
+  return `/api/attendance-exceptions/${id}`;
+};
+
+export const getAttendanceException = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AttendanceExceptionResponse> => {
+  return customFetch<AttendanceExceptionResponse>(
+    getGetAttendanceExceptionUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAttendanceExceptionQueryKey = (id: number) => {
+  return [`/api/attendance-exceptions/${id}`] as const;
+};
+
+export const getGetAttendanceExceptionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAttendanceException>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceException>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAttendanceExceptionQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAttendanceException>>
+  > = ({ signal }) => getAttendanceException(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAttendanceException>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAttendanceExceptionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAttendanceException>>
+>;
+export type GetAttendanceExceptionQueryError = ErrorType<void>;
+
+/**
+ * @summary Get an attendance exception
+ */
+
+export function useGetAttendanceException<
+  TData = Awaited<ReturnType<typeof getAttendanceException>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAttendanceException>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAttendanceExceptionQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update attendance exception (review/submit)
+ */
+export const getUpdateAttendanceExceptionUrl = (id: number) => {
+  return `/api/attendance-exceptions/${id}`;
+};
+
+export const updateAttendanceException = async (
+  id: number,
+  updateAttendanceExceptionRequest: UpdateAttendanceExceptionRequest,
+  options?: RequestInit,
+): Promise<AttendanceExceptionResponse> => {
+  return customFetch<AttendanceExceptionResponse>(
+    getUpdateAttendanceExceptionUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateAttendanceExceptionRequest),
+    },
+  );
+};
+
+export const getUpdateAttendanceExceptionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAttendanceException>>,
+    TError,
+    { id: number; data: BodyType<UpdateAttendanceExceptionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAttendanceException>>,
+  TError,
+  { id: number; data: BodyType<UpdateAttendanceExceptionRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateAttendanceException"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAttendanceException>>,
+    { id: number; data: BodyType<UpdateAttendanceExceptionRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateAttendanceException(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAttendanceExceptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAttendanceException>>
+>;
+export type UpdateAttendanceExceptionMutationBody =
+  BodyType<UpdateAttendanceExceptionRequest>;
+export type UpdateAttendanceExceptionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update attendance exception (review/submit)
+ */
+export const useUpdateAttendanceException = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAttendanceException>>,
+    TError,
+    { id: number; data: BodyType<UpdateAttendanceExceptionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAttendanceException>>,
+  TError,
+  { id: number; data: BodyType<UpdateAttendanceExceptionRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateAttendanceExceptionMutationOptions(options));
+};
+
+/**
+ * @summary List face verification attempts
+ */
+export const getListFaceVerificationAttemptsUrl = (
+  params?: ListFaceVerificationAttemptsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/face-verification-attempts?${stringifiedParams}`
+    : `/api/face-verification-attempts`;
+};
+
+export const listFaceVerificationAttempts = async (
+  params?: ListFaceVerificationAttemptsParams,
+  options?: RequestInit,
+): Promise<FaceVerificationAttemptListResponse> => {
+  return customFetch<FaceVerificationAttemptListResponse>(
+    getListFaceVerificationAttemptsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListFaceVerificationAttemptsQueryKey = (
+  params?: ListFaceVerificationAttemptsParams,
+) => {
+  return [
+    `/api/face-verification-attempts`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListFaceVerificationAttemptsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFaceVerificationAttempts>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListFaceVerificationAttemptsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFaceVerificationAttempts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListFaceVerificationAttemptsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFaceVerificationAttempts>>
+  > = ({ signal }) =>
+    listFaceVerificationAttempts(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFaceVerificationAttempts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFaceVerificationAttemptsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFaceVerificationAttempts>>
+>;
+export type ListFaceVerificationAttemptsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List face verification attempts
+ */
+
+export function useListFaceVerificationAttempts<
+  TData = Awaited<ReturnType<typeof listFaceVerificationAttempts>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListFaceVerificationAttemptsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFaceVerificationAttempts>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFaceVerificationAttemptsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Log a face verification attempt
+ */
+export const getCreateFaceVerificationAttemptUrl = () => {
+  return `/api/face-verification-attempts`;
+};
+
+export const createFaceVerificationAttempt = async (
+  createFaceVerificationAttemptRequest: CreateFaceVerificationAttemptRequest,
+  options?: RequestInit,
+): Promise<FaceVerificationAttemptResponse> => {
+  return customFetch<FaceVerificationAttemptResponse>(
+    getCreateFaceVerificationAttemptUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createFaceVerificationAttemptRequest),
+    },
+  );
+};
+
+export const getCreateFaceVerificationAttemptMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFaceVerificationAttempt>>,
+    TError,
+    { data: BodyType<CreateFaceVerificationAttemptRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFaceVerificationAttempt>>,
+  TError,
+  { data: BodyType<CreateFaceVerificationAttemptRequest> },
+  TContext
+> => {
+  const mutationKey = ["createFaceVerificationAttempt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFaceVerificationAttempt>>,
+    { data: BodyType<CreateFaceVerificationAttemptRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createFaceVerificationAttempt(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFaceVerificationAttemptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFaceVerificationAttempt>>
+>;
+export type CreateFaceVerificationAttemptMutationBody =
+  BodyType<CreateFaceVerificationAttemptRequest>;
+export type CreateFaceVerificationAttemptMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Log a face verification attempt
+ */
+export const useCreateFaceVerificationAttempt = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFaceVerificationAttempt>>,
+    TError,
+    { data: BodyType<CreateFaceVerificationAttemptRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createFaceVerificationAttempt>>,
+  TError,
+  { data: BodyType<CreateFaceVerificationAttemptRequest> },
+  TContext
+> => {
+  return useMutation(getCreateFaceVerificationAttemptMutationOptions(options));
+};
+
+/**
+ * @summary List face verification attempts for a user
+ */
+export const getListFaceVerificationAttemptsByUserUrl = (
+  userId: number,
+  params?: ListFaceVerificationAttemptsByUserParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/face-verification-attempts/user/${userId}?${stringifiedParams}`
+    : `/api/face-verification-attempts/user/${userId}`;
+};
+
+export const listFaceVerificationAttemptsByUser = async (
+  userId: number,
+  params?: ListFaceVerificationAttemptsByUserParams,
+  options?: RequestInit,
+): Promise<FaceVerificationAttemptListResponse> => {
+  return customFetch<FaceVerificationAttemptListResponse>(
+    getListFaceVerificationAttemptsByUserUrl(userId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListFaceVerificationAttemptsByUserQueryKey = (
+  userId: number,
+  params?: ListFaceVerificationAttemptsByUserParams,
+) => {
+  return [
+    `/api/face-verification-attempts/user/${userId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListFaceVerificationAttemptsByUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: number,
+  params?: ListFaceVerificationAttemptsByUserParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListFaceVerificationAttemptsByUserQueryKey(userId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>
+  > = ({ signal }) =>
+    listFaceVerificationAttemptsByUser(userId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!userId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFaceVerificationAttemptsByUserQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>
+>;
+export type ListFaceVerificationAttemptsByUserQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List face verification attempts for a user
+ */
+
+export function useListFaceVerificationAttemptsByUser<
+  TData = Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: number,
+  params?: ListFaceVerificationAttemptsByUserParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listFaceVerificationAttemptsByUser>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFaceVerificationAttemptsByUserQueryOptions(
+    userId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a face verification attempt
+ */
+export const getGetFaceVerificationAttemptUrl = (id: number) => {
+  return `/api/face-verification-attempts/${id}`;
+};
+
+export const getFaceVerificationAttempt = async (
+  id: number,
+  options?: RequestInit,
+): Promise<FaceVerificationAttemptResponse> => {
+  return customFetch<FaceVerificationAttemptResponse>(
+    getGetFaceVerificationAttemptUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetFaceVerificationAttemptQueryKey = (id: number) => {
+  return [`/api/face-verification-attempts/${id}`] as const;
+};
+
+export const getGetFaceVerificationAttemptQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFaceVerificationAttempt>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFaceVerificationAttempt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFaceVerificationAttemptQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFaceVerificationAttempt>>
+  > = ({ signal }) =>
+    getFaceVerificationAttempt(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFaceVerificationAttempt>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFaceVerificationAttemptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFaceVerificationAttempt>>
+>;
+export type GetFaceVerificationAttemptQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a face verification attempt
+ */
+
+export function useGetFaceVerificationAttempt<
+  TData = Awaited<ReturnType<typeof getFaceVerificationAttempt>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFaceVerificationAttempt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFaceVerificationAttemptQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update face verification attempt notes/review
+ */
+export const getUpdateFaceVerificationAttemptUrl = (id: number) => {
+  return `/api/face-verification-attempts/${id}`;
+};
+
+export const updateFaceVerificationAttempt = async (
+  id: number,
+  updateFaceVerificationAttemptRequest: UpdateFaceVerificationAttemptRequest,
+  options?: RequestInit,
+): Promise<FaceVerificationAttemptResponse> => {
+  return customFetch<FaceVerificationAttemptResponse>(
+    getUpdateFaceVerificationAttemptUrl(id),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateFaceVerificationAttemptRequest),
+    },
+  );
+};
+
+export const getUpdateFaceVerificationAttemptMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFaceVerificationAttempt>>,
+    TError,
+    { id: number; data: BodyType<UpdateFaceVerificationAttemptRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateFaceVerificationAttempt>>,
+  TError,
+  { id: number; data: BodyType<UpdateFaceVerificationAttemptRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateFaceVerificationAttempt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateFaceVerificationAttempt>>,
+    { id: number; data: BodyType<UpdateFaceVerificationAttemptRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateFaceVerificationAttempt(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateFaceVerificationAttemptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateFaceVerificationAttempt>>
+>;
+export type UpdateFaceVerificationAttemptMutationBody =
+  BodyType<UpdateFaceVerificationAttemptRequest>;
+export type UpdateFaceVerificationAttemptMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update face verification attempt notes/review
+ */
+export const useUpdateFaceVerificationAttempt = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFaceVerificationAttempt>>,
+    TError,
+    { id: number; data: BodyType<UpdateFaceVerificationAttemptRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateFaceVerificationAttempt>>,
+  TError,
+  { id: number; data: BodyType<UpdateFaceVerificationAttemptRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateFaceVerificationAttemptMutationOptions(options));
+};
+
+/**
  * @summary List productivity scores
  */
 export const getListProductivityScoresUrl = (
@@ -3076,6 +4063,306 @@ export function useGetUserProductivity<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetUserProductivityQueryOptions(userId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Calculate productivity for a user
+ */
+export const getCalculateProductivityUrl = () => {
+  return `/api/productivity/calculate`;
+};
+
+export const calculateProductivity = async (
+  calculateProductivityRequest: CalculateProductivityRequest,
+  options?: RequestInit,
+): Promise<CalculateProductivityResponse> => {
+  return customFetch<CalculateProductivityResponse>(
+    getCalculateProductivityUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(calculateProductivityRequest),
+    },
+  );
+};
+
+export const getCalculateProductivityMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof calculateProductivity>>,
+    TError,
+    { data: BodyType<CalculateProductivityRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof calculateProductivity>>,
+  TError,
+  { data: BodyType<CalculateProductivityRequest> },
+  TContext
+> => {
+  const mutationKey = ["calculateProductivity"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof calculateProductivity>>,
+    { data: BodyType<CalculateProductivityRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return calculateProductivity(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CalculateProductivityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof calculateProductivity>>
+>;
+export type CalculateProductivityMutationBody =
+  BodyType<CalculateProductivityRequest>;
+export type CalculateProductivityMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Calculate productivity for a user
+ */
+export const useCalculateProductivity = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof calculateProductivity>>,
+    TError,
+    { data: BodyType<CalculateProductivityRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof calculateProductivity>>,
+  TError,
+  { data: BodyType<CalculateProductivityRequest> },
+  TContext
+> => {
+  return useMutation(getCalculateProductivityMutationOptions(options));
+};
+
+/**
+ * @summary Calculate productivity for all users
+ */
+export const getCalculateAllProductivityUrl = () => {
+  return `/api/productivity/calculate-all`;
+};
+
+export const calculateAllProductivity = async (
+  calculateAllProductivityRequest?: CalculateAllProductivityRequest,
+  options?: RequestInit,
+): Promise<CalculateAllProductivityResponse> => {
+  return customFetch<CalculateAllProductivityResponse>(
+    getCalculateAllProductivityUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(calculateAllProductivityRequest),
+    },
+  );
+};
+
+export const getCalculateAllProductivityMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof calculateAllProductivity>>,
+    TError,
+    { data: BodyType<CalculateAllProductivityRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof calculateAllProductivity>>,
+  TError,
+  { data: BodyType<CalculateAllProductivityRequest> },
+  TContext
+> => {
+  const mutationKey = ["calculateAllProductivity"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof calculateAllProductivity>>,
+    { data: BodyType<CalculateAllProductivityRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return calculateAllProductivity(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CalculateAllProductivityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof calculateAllProductivity>>
+>;
+export type CalculateAllProductivityMutationBody =
+  BodyType<CalculateAllProductivityRequest>;
+export type CalculateAllProductivityMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Calculate productivity for all users
+ */
+export const useCalculateAllProductivity = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof calculateAllProductivity>>,
+    TError,
+    { data: BodyType<CalculateAllProductivityRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof calculateAllProductivity>>,
+  TError,
+  { data: BodyType<CalculateAllProductivityRequest> },
+  TContext
+> => {
+  return useMutation(getCalculateAllProductivityMutationOptions(options));
+};
+
+/**
+ * @summary Get detailed productivity report for a user
+ */
+export const getGetProductivityReportUrl = (
+  userId: number,
+  params?: GetProductivityReportParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/productivity/report/${userId}?${stringifiedParams}`
+    : `/api/productivity/report/${userId}`;
+};
+
+export const getProductivityReport = async (
+  userId: number,
+  params?: GetProductivityReportParams,
+  options?: RequestInit,
+): Promise<ProductivityReportResponse> => {
+  return customFetch<ProductivityReportResponse>(
+    getGetProductivityReportUrl(userId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetProductivityReportQueryKey = (
+  userId: number,
+  params?: GetProductivityReportParams,
+) => {
+  return [
+    `/api/productivity/report/${userId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetProductivityReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProductivityReport>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: number,
+  params?: GetProductivityReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProductivityReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProductivityReportQueryKey(userId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProductivityReport>>
+  > = ({ signal }) =>
+    getProductivityReport(userId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!userId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProductivityReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProductivityReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProductivityReport>>
+>;
+export type GetProductivityReportQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get detailed productivity report for a user
+ */
+
+export function useGetProductivityReport<
+  TData = Awaited<ReturnType<typeof getProductivityReport>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: number,
+  params?: GetProductivityReportParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProductivityReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProductivityReportQueryOptions(
+    userId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

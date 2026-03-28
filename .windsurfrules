@@ -1,0 +1,25 @@
+# backup — Project Memory
+# Auto-synced | 187 observations
+
+**Stack:** JavaScript/TypeScript · React + Tailwind
+
+# 🛡️ GLOBAL SAFETY RULES
+
+- **NEVER** run `git clean -fd` or `git reset --hard` without checking `git log` and verifying commits exist.
+- **NEVER** delete untracked files or folders blindly. Always backup or stash before bulk edits.
+
+# 🧭 ACTIVE CONTEXT
+
+> Always read `.cursor/active-context.md` for exact instructions on the specific file you are currently editing. It updates dynamically.
+
+# ⚡ Available Tools (ON-DEMAND only)
+- `save(title, content, category)` — Save a note + auto-detect conflicts
+- `batch_save(items[])` — Save multiple notes in 1 call
+- `query(text)` — Search memory for architecture, past fixes, decisions
+- `search(text)` — Full-text search for details
+- `check_errors()` — Check compiler errors after edits
+
+> ℹ️ DO NOT call get_context() or get_gotchas() at startup — context above IS your context.
+
+---
+*Auto-synced | 2026-03-26*

@@ -21,6 +21,9 @@ export const medicalCertificatesTable = pgTable("medical_certificates", {
   mcEndDate: text("mc_end_date"),
   verificationStatus: text("verification_status").$type<McVerificationStatus>().notNull().default("pending"),
   verificationNotes: text("verification_notes"),
+  verifiedBy: integer("verified_by").references(() => usersTable.id),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

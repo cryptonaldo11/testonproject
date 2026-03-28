@@ -2,12 +2,74 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useGetMe, UserResponse } from "@workspace/api-client-react";
 
+export const ADMIN_ONLY_ROLES = ["admin"] as const;
+export const ADMIN_HR_ROLES = ["admin", "hr"] as const;
+export const MANAGER_ROLES = ["manager"] as const;
+export const OPERATIONAL_ROLES = ["admin", "hr", "manager"] as const;
+export const SELF_SERVICE_ROLES = ["worker", "driver"] as const;
+
+export type AppPermission =
+  | "operational:read:all"
+  | "operational:read:team"
+  | "reports:read:all"
+  | "reports:read:team"
+  | "users:read"
+  | "users:write"
+  | "leaves:review"
+  | "alerts:resolve"
+  | "alerts:assign"
+  | "exceptions:review"
+  | "productivity:manage"
+  | "face:manage";
+
+type AppRole = "admin" | "hr" | "manager" | "worker" | "driver";
+
+const ALL_PERMISSIONS: readonly AppPermission[] = [
+  "operational:read:all",
+  "operational:read:team",
+  "reports:read:all",
+  "reports:read:team",
+  "users:read",
+  "users:write",
+  "leaves:review",
+  "alerts:resolve",
+  "alerts:assign",
+  "exceptions:review",
+  "productivity:manage",
+  "face:manage",
+];
+
+const ROLE_PERMISSIONS: Record<AppRole, readonly AppPermission[]> = {
+  admin: ALL_PERMISSIONS,
+  hr: [
+    "operational:read:all",
+    "reports:read:all",
+    "users:read",
+    "leaves:review",
+    "alerts:resolve",
+    "alerts:assign",
+    "exceptions:review",
+    "productivity:manage",
+    "face:manage",
+  ],
+  manager: [
+    "operational:read:team",
+    "reports:read:team",
+    "users:read",
+    "alerts:assign",
+    "exceptions:review",
+  ],
+  worker: [],
+  driver: [],
+};
+
 interface AuthContextType {
   user: UserResponse | null;
   isLoading: boolean;
   login: (token: string) => void;
   logout: () => void;
-  hasRole: (roles: string[]) => boolean;
+  hasRole: (roles: readonly string[]) => boolean;
+  hasPermission: (permission: AppPermission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -32,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const { data: user, isLoading, isError, refetch } = useGetMe({
     query: {
+      queryKey: ["auth", "me"],
       enabled: !!token,
       retry: false,
     }
@@ -57,9 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const hasRole = (roles: string[]) => {
+  const hasRole = (roles: readonly string[]) => {
     if (!user) return false;
     return roles.includes(user.role);
+  };
+
+  const hasPermission = (permission: AppPermission) => {
+    if (!user) return false;
+    return ROLE_PERMISSIONS[user.role as AppRole].includes(permission);
   };
 
   // If we have a token but haven't loaded user yet, show loading
@@ -74,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user: user || null, isLoading, login: handleLogin, logout: handleLogout, hasRole }}>
+    <AuthContext.Provider value={{ user: user || null, isLoading, login: handleLogin, logout: handleLogout, hasRole, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

@@ -10,7 +10,9 @@ export type UpdateAlertRequestStatus =
   (typeof UpdateAlertRequestStatus)[keyof typeof UpdateAlertRequestStatus];
 
 export const UpdateAlertRequestStatus = {
-  active: "active",
+  new: "new",
+  acknowledged: "acknowledged",
+  in_progress: "in_progress",
   resolved: "resolved",
   dismissed: "dismissed",
 } as const;

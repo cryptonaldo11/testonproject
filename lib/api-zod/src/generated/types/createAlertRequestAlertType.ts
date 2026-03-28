@@ -16,4 +16,6 @@ export const CreateAlertRequestAlertType = {
   policy_violation: "policy_violation",
   ghost_worker: "ghost_worker",
   leave_limit_exceeded: "leave_limit_exceeded",
+  mc_expiring_soon: "mc_expiring_soon",
+  mc_expired: "mc_expired",
 } as const;

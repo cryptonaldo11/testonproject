@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLogin } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
@@ -10,8 +10,19 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login } = useAuth();
-  const [, setLocation] = useLocation();
+  const { user, login } = useAuth();
+  const [location, setLocation] = useLocation();
+  const redirectTarget = React.useMemo(() => {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    return params.get("redirect") || "/dashboard";
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      setLocation(redirectTarget);
+    }
+  }, [user, setLocation, redirectTarget]);
 
   const loginMutation = useLogin({
     mutation: {

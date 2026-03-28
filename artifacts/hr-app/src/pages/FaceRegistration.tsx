@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListWorkers, useRegisterFace, useDeleteFace, useListUsers } from "@workspace/api-client-react";
 import { Card, CardContent, Button, Badge } from "@/components/ui/core";
+import { ADMIN_HR_ROLES, useAuth } from "@/lib/auth";
 import { Camera, CameraOff, CheckCircle2, AlertCircle, Scan, Trash2 } from "lucide-react";
 
 const FACE_DETECT_MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
@@ -82,8 +84,10 @@ function useFaceCapture(videoRef: React.RefObject<HTMLVideoElement | null>, canv
 }
 
 export default function FaceRegistration() {
-  const { data: workersData, refetch } = useListWorkers();
-  const { data: usersData } = useListUsers();
+  const { hasRole } = useAuth();
+  const isAdminHR = hasRole(ADMIN_HR_ROLES);
+  const { data: workersData, refetch } = useListWorkers(undefined, { query: { queryKey: ["workers", "face-registration"], enabled: isAdminHR } });
+  const { data: usersData } = useListUsers(undefined, { query: { queryKey: ["users", "face-registration"], enabled: isAdminHR } });
 
   const registerFaceMutation = useRegisterFace();
   const deleteFaceMutation = useDeleteFace();
@@ -168,6 +172,10 @@ export default function FaceRegistration() {
   };
 
   const workers = workersData?.workers ?? [];
+
+  if (!isAdminHR) {
+    return <Redirect to="/dashboard" />;
+  }
 
   return (
     <DashboardLayout>

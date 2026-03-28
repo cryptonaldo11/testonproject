@@ -11,6 +11,8 @@ import medicalCertificatesRouter from "./medical_certificates";
 import alertsRouter from "./alerts";
 import productivityRouter from "./productivity";
 import storageRouter from "./storage";
+import attendanceExceptionsRouter from "./attendance_exceptions";
+import faceVerificationRouter from "./face_verification";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use(medicalCertificatesRouter);
 router.use(alertsRouter);
 router.use(productivityRouter);
 router.use(storageRouter);
+router.use(attendanceExceptionsRouter);
+router.use(faceVerificationRouter);
 
 export default router;

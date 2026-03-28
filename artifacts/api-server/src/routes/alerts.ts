@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, alertsTable, type AlertType, type AlertSeverity, type AlertStatus } from "@workspace/db";
-import { eq, and, SQL } from "drizzle-orm";
+import { eq, and, SQL, inArray, isNull, or } from "drizzle-orm";
 import {
   ListAlertsQueryParams,
   ListAlertsResponse,
@@ -9,7 +9,7 @@ import {
   UpdateAlertBody,
   UpdateAlertResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
+import { requireAuth, requireRole, getScopedUserIds, canResolveAlerts, canAssignAlerts } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -23,8 +23,14 @@ function mapAlert(a: typeof alertsTable.$inferSelect) {
     message: a.message,
     status: a.status,
     relatedDate: a.relatedDate ?? null,
+    assignedTo: a.assignedTo ?? null,
+    assignedBy: a.assignedBy ?? null,
+    assignedAt: a.assignedAt ?? null,
     resolvedBy: a.resolvedBy ?? null,
     resolvedAt: a.resolvedAt ?? null,
+    resolutionNotes: a.resolutionNotes ?? null,
+    dismissedBy: a.dismissedBy ?? null,
+    dismissedAt: a.dismissedAt ?? null,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   };
@@ -38,12 +44,15 @@ router.get("/alerts", requireAuth, async (req, res): Promise<void> => {
   }
 
   const jwtUser = req.user!;
-  const conditions: SQL[] = [];
+  const scopedUserIds = await getScopedUserIds(jwtUser, params.data.userId);
+  if (scopedUserIds !== null && scopedUserIds.length === 0) {
+    res.json(ListAlertsResponse.parse({ alerts: [], total: 0 }));
+    return;
+  }
 
-  if (isRestrictedRole(jwtUser.role)) {
-    conditions.push(eq(alertsTable.userId, jwtUser.userId));
-  } else if (params.data.userId) {
-    conditions.push(eq(alertsTable.userId, params.data.userId));
+  const conditions: SQL[] = [];
+  if (scopedUserIds !== null) {
+    conditions.push(or(inArray(alertsTable.userId, scopedUserIds), isNull(alertsTable.userId))!);
   }
 
   if (params.data.alertType) {
@@ -54,6 +63,9 @@ router.get("/alerts", requireAuth, async (req, res): Promise<void> => {
   }
   if (params.data.severity) {
     conditions.push(eq(alertsTable.severity, params.data.severity as AlertSeverity));
+  }
+  if (params.data.assignedTo !== undefined) {
+    conditions.push(eq(alertsTable.assignedTo, params.data.assignedTo));
   }
 
   const alerts = await db.select().from(alertsTable)
@@ -78,7 +90,7 @@ router.post("/alerts", requireAuth, requireRole("admin", "hr"), async (req, res)
     title: parsed.data.title,
     message: parsed.data.message,
     relatedDate: parsed.data.relatedDate ?? null,
-    status: "active",
+    status: "new",
   }).returning();
 
   res.status(201).json(mapAlert(alert));
@@ -105,8 +117,17 @@ router.patch("/alerts/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  // Workers/drivers can only update alerts assigned to themselves, and cannot resolve
-  if (isRestrictedRole(jwtUser.role)) {
+  const scopedUserIds = await getScopedUserIds(jwtUser, existing.userId ?? undefined);
+  const canAccessAlert = existing.userId === null
+    ? canResolveAlerts(jwtUser.role)
+    : scopedUserIds === null || scopedUserIds.length > 0;
+
+  if (!canAccessAlert) {
+    res.status(403).json({ error: "Forbidden: cannot modify alert outside your scope" });
+    return;
+  }
+
+  if (!canResolveAlerts(jwtUser.role)) {
     if (existing.userId !== jwtUser.userId) {
       res.status(403).json({ error: "Forbidden: cannot modify another user's alert" });
       return;
@@ -119,10 +140,28 @@ router.patch("/alerts/:id", requireAuth, async (req, res): Promise<void> => {
 
   const updateData: Partial<typeof alertsTable.$inferInsert> = {};
   if (body.data.status) updateData.status = body.data.status as AlertStatus;
+  if (body.data.resolutionNotes) updateData.resolutionNotes = body.data.resolutionNotes;
 
+  // Handle status-specific metadata
   if (body.data.status === "resolved") {
     updateData.resolvedBy = jwtUser.userId;
     updateData.resolvedAt = new Date();
+  }
+
+  if (body.data.status === "dismissed") {
+    updateData.dismissedBy = jwtUser.userId;
+    updateData.dismissedAt = new Date();
+  }
+
+  // Handle assignment
+  if (body.data.assignedTo !== undefined) {
+    if (!canAssignAlerts(jwtUser.role)) {
+      res.status(403).json({ error: "Forbidden: cannot assign alerts" });
+      return;
+    }
+    updateData.assignedTo = body.data.assignedTo;
+    updateData.assignedBy = jwtUser.userId;
+    updateData.assignedAt = new Date();
   }
 
   const [alert] = await db.update(alertsTable)

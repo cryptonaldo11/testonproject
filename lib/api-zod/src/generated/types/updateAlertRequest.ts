@@ -9,4 +9,6 @@ import type { UpdateAlertRequestStatus } from "./updateAlertRequestStatus";
 
 export interface UpdateAlertRequest {
   status?: UpdateAlertRequestStatus;
+  assignedTo?: number;
+  resolutionNotes?: string;
 }

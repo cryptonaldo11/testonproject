@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, rolesTable, insertRoleSchema } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { requireAuth, requireRole } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -45,7 +45,7 @@ router.post("/roles", requireAuth, requireRole("admin"), async (req, res): Promi
 });
 
 router.get("/roles/:id", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;

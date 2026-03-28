@@ -5,13 +5,13 @@
  * Teston HR Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateUserRequestRole } from "./createUserRequestRole";
+import type { UserRole } from "./userRole";
 
 export interface CreateUserRequest {
   name: string;
   email: string;
   password: string;
-  role: CreateUserRequestRole;
+  role: UserRole;
   employeeId?: string;
   departmentId?: number;
   phone?: string;

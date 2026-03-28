@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, attendanceLogsTable, usersTable, departmentsTable, workersTable, type AttendanceStatus } from "@workspace/db";
-import { eq, and, gte, lte, SQL } from "drizzle-orm";
+import { eq, and, gte, lte, SQL, inArray } from "drizzle-orm";
 
 import {
   ListAttendanceQueryParams,
@@ -18,7 +18,8 @@ import {
   GetAttendanceSummaryQueryParams,
   GetAttendanceSummaryResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
+import { requireAuth, requireRole, getScopedUserIds, canAccessUserId, canReadReports } from "../lib/auth";
+import { recalculateProductivityForDate } from "../lib/productivity";
 
 const FACE_MATCH_THRESHOLD = 0.6;
 
@@ -59,12 +60,15 @@ router.get("/attendance", requireAuth, async (req, res): Promise<void> => {
   }
 
   const jwtUser = req.user!;
-  const conditions: SQL[] = [];
+  const scopedUserIds = await getScopedUserIds(jwtUser, params.data.userId);
+  if (scopedUserIds !== null && scopedUserIds.length === 0) {
+    res.json(ListAttendanceResponse.parse({ logs: [], total: 0 }));
+    return;
+  }
 
-  if (isRestrictedRole(jwtUser.role)) {
-    conditions.push(eq(attendanceLogsTable.userId, jwtUser.userId));
-  } else if (params.data.userId) {
-    conditions.push(eq(attendanceLogsTable.userId, params.data.userId));
+  const conditions: SQL[] = [];
+  if (scopedUserIds !== null) {
+    conditions.push(inArray(attendanceLogsTable.userId, scopedUserIds));
   }
 
   if (params.data.startDate) {
@@ -94,8 +98,7 @@ router.post("/attendance/checkin", requireAuth, async (req, res): Promise<void> 
 
   const jwtUser = req.user!;
 
-  // Workers and drivers can only check in for themselves
-  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+  if (!["admin", "hr"].includes(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden: can only check in for yourself" });
     return;
   }
@@ -144,6 +147,17 @@ router.post("/attendance/checkin", requireAuth, async (req, res): Promise<void> 
     isManualEntry: "false",
   }).returning();
 
+  try {
+    await recalculateProductivityForDate(log.userId, log.date);
+  } catch (error) {
+    console.error("Failed to recalculate productivity after attendance check-in", {
+      userId: log.userId,
+      date: log.date,
+      attendanceId: log.id,
+      error,
+    });
+  }
+
   res.json(CheckInResponse.parse(mapLog(log)));
 });
 
@@ -156,8 +170,7 @@ router.post("/attendance/checkout", requireAuth, async (req, res): Promise<void>
 
   const jwtUser = req.user!;
 
-  // Workers and drivers can only check out for themselves
-  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+  if (!["admin", "hr"].includes(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden: can only check out for yourself" });
     return;
   }
@@ -209,10 +222,27 @@ router.post("/attendance/checkout", requireAuth, async (req, res): Promise<void>
     .where(eq(attendanceLogsTable.id, existing.id))
     .returning();
 
+  try {
+    await recalculateProductivityForDate(log.userId, log.date);
+  } catch (error) {
+    console.error("Failed to recalculate productivity after attendance checkout", {
+      userId: log.userId,
+      date: log.date,
+      attendanceId: log.id,
+      error,
+    });
+  }
+
   res.json(CheckOutResponse.parse(mapLog(log)));
 });
 
-router.get("/attendance/summary", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
+router.get("/attendance/summary", requireAuth, async (req, res): Promise<void> => {
+  const jwtUser = req.user!;
+  if (!canReadReports(jwtUser.role)) {
+    res.status(403).json({ error: "Forbidden: insufficient permissions" });
+    return;
+  }
+
   const params = GetAttendanceSummaryQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -221,11 +251,21 @@ router.get("/attendance/summary", requireAuth, requireRole("admin", "hr"), async
 
   const startDate = params.data.startDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
   const endDate = params.data.endDate ?? new Date().toISOString().slice(0, 10);
+  const scopedUserIds = await getScopedUserIds(jwtUser);
+
+  if (scopedUserIds !== null && scopedUserIds.length === 0) {
+    res.json(GetAttendanceSummaryResponse.parse({ items: [], startDate, endDate, totalManHours: "0.00", totalCost: "0.00" }));
+    return;
+  }
 
   const conditions: SQL[] = [
     gte(attendanceLogsTable.date, startDate),
     lte(attendanceLogsTable.date, endDate),
   ];
+
+  if (scopedUserIds !== null) {
+    conditions.push(inArray(attendanceLogsTable.userId, scopedUserIds));
+  }
 
   const logs = await db.select().from(attendanceLogsTable)
     .where(and(...conditions));
@@ -235,9 +275,9 @@ router.get("/attendance/summary", requireAuth, requireRole("admin", "hr"), async
 
   const deptMap = new Map(depts.map(d => [d.id, d.name]));
 
-  let filteredUsers = users;
+  let filteredUsers = users.filter((user) => scopedUserIds === null || scopedUserIds.includes(user.id));
   if (params.data.departmentId) {
-    filteredUsers = users.filter(u => u.departmentId === params.data.departmentId);
+    filteredUsers = filteredUsers.filter(u => u.departmentId === params.data.departmentId);
   }
 
   const items = filteredUsers.map(user => {
@@ -284,7 +324,7 @@ router.get("/attendance/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   const jwtUser = req.user!;
-  if (isRestrictedRole(jwtUser.role) && log.userId !== jwtUser.userId) {
+  if (!(await canAccessUserId(jwtUser, log.userId))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -310,6 +350,17 @@ router.post("/attendance", requireAuth, requireRole("admin", "hr"), async (req, 
     notes: parsed.data.notes ?? null,
     isManualEntry: parsed.data.isManualEntry ?? "true",
   }).returning();
+
+  try {
+    await recalculateProductivityForDate(log.userId, log.date);
+  } catch (error) {
+    console.error("Failed to recalculate productivity after attendance create", {
+      userId: log.userId,
+      date: log.date,
+      attendanceId: log.id,
+      error,
+    });
+  }
 
   res.status(201).json(GetAttendanceResponse.parse(mapLog(log)));
 });
@@ -342,6 +393,17 @@ router.patch("/attendance/:id", requireAuth, requireRole("admin", "hr"), async (
   if (!log) {
     res.status(404).json({ error: "Record not found" });
     return;
+  }
+
+  try {
+    await recalculateProductivityForDate(log.userId, log.date);
+  } catch (error) {
+    console.error("Failed to recalculate productivity after attendance update", {
+      userId: log.userId,
+      date: log.date,
+      attendanceId: log.id,
+      error,
+    });
   }
 
   res.json(UpdateAttendanceResponse.parse(mapLog(log)));

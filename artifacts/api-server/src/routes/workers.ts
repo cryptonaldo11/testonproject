@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, workersTable, insertWorkerSchema, type WorkerStatus } from "@workspace/db";
-import { eq, and, SQL } from "drizzle-orm";
-import { z } from "zod/v4";
-import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
+import { eq, and, SQL, inArray } from "drizzle-orm";
+import { z } from "zod";
+import { requireAuth, requireRole, getScopedUserIds, canAccessUserId } from "../lib/auth";
 import { RegisterFaceBody, RegisterFaceParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -49,19 +49,26 @@ function mapWorker(w: typeof workersTable.$inferSelect) {
 
 router.get("/workers", requireAuth, async (req, res): Promise<void> => {
   const jwtUser = req.user!;
-  const conditions: SQL[] = [];
+  const requestedUserId = req.query.userId ? parseInt(req.query.userId as string, 10) : undefined;
+  const scopedUserIds = await getScopedUserIds(jwtUser, requestedUserId);
 
-  if (isRestrictedRole(jwtUser.role)) {
-    conditions.push(eq(workersTable.userId, jwtUser.userId));
-  } else {
-    const departmentId = req.query.departmentId ? parseInt(req.query.departmentId as string, 10) : undefined;
-    const status = req.query.status as WorkerStatus | undefined;
-    if (departmentId && !isNaN(departmentId)) {
-      conditions.push(eq(workersTable.departmentId, departmentId));
-    }
-    if (status) {
-      conditions.push(eq(workersTable.status, status));
-    }
+  if (scopedUserIds !== null && scopedUserIds.length === 0) {
+    res.json({ workers: [], total: 0 });
+    return;
+  }
+
+  const conditions: SQL[] = [];
+  if (scopedUserIds !== null) {
+    conditions.push(inArray(workersTable.userId, scopedUserIds));
+  }
+
+  const departmentId = req.query.departmentId ? parseInt(req.query.departmentId as string, 10) : undefined;
+  const status = req.query.status as WorkerStatus | undefined;
+  if (departmentId && !isNaN(departmentId)) {
+    conditions.push(eq(workersTable.departmentId, departmentId));
+  }
+  if (status) {
+    conditions.push(eq(workersTable.status, status));
   }
 
   const workers = await db.select().from(workersTable)
@@ -93,7 +100,7 @@ router.post("/workers", requireAuth, requireRole("admin", "hr"), async (req, res
 });
 
 router.get("/workers/:id", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -106,7 +113,7 @@ router.get("/workers/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   const jwtUser = req.user!;
-  if (isRestrictedRole(jwtUser.role) && worker.userId !== jwtUser.userId) {
+  if (!(await canAccessUserId(jwtUser, worker.userId))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -115,7 +122,7 @@ router.get("/workers/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.patch("/workers/:id", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -168,7 +175,7 @@ router.get("/workers/me/face-descriptor", requireAuth, async (req, res): Promise
   res.json({ registered: true, descriptor: worker.faceDescriptor });
 });
 
-router.post("/workers/:workerId/face", requireAuth, requireRole(["admin", "hr"]), async (req, res) => {
+router.post("/workers/:workerId/face", requireAuth, requireRole("admin", "hr"), async (req, res) => {
   const params = RegisterFaceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid workerId" });
@@ -195,7 +202,7 @@ router.post("/workers/:workerId/face", requireAuth, requireRole(["admin", "hr"])
   res.json(mapWorker(worker));
 });
 
-router.delete("/workers/:workerId/face", requireAuth, requireRole(["admin", "hr"]), async (req, res) => {
+router.delete("/workers/:workerId/face", requireAuth, requireRole("admin", "hr"), async (req, res) => {
   const params = RegisterFaceParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid workerId" });

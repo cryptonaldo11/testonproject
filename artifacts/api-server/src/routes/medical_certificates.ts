@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, medicalCertificatesTable, type McVerificationStatus } from "@workspace/db";
-import { eq, and, SQL } from "drizzle-orm";
+import { eq, and, SQL, inArray } from "drizzle-orm";
 import {
   ListMedicalCertificatesQueryParams,
   ListMedicalCertificatesResponse,
@@ -11,7 +11,8 @@ import {
   UpdateMedicalCertificateBody,
   UpdateMedicalCertificateResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole, isRestrictedRole } from "../lib/auth";
+import { requireAuth, requireRole, getScopedUserIds, canAccessUserId } from "../lib/auth";
+import { checkMcExpiry } from "../lib/mcExpiryService";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,9 @@ function mapCert(c: typeof medicalCertificatesTable.$inferSelect) {
     mcEndDate: c.mcEndDate ?? null,
     verificationStatus: c.verificationStatus,
     verificationNotes: c.verificationNotes ?? null,
+    verifiedBy: c.verifiedBy ?? null,
+    verifiedAt: c.verifiedAt ?? null,
+    reminderSentAt: c.reminderSentAt ?? null,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };
@@ -43,12 +47,15 @@ router.get("/medical-certificates", requireAuth, async (req, res): Promise<void>
   }
 
   const jwtUser = req.user!;
-  const conditions: SQL[] = [];
+  const scopedUserIds = await getScopedUserIds(jwtUser, params.data.userId);
+  if (scopedUserIds !== null && scopedUserIds.length === 0) {
+    res.json(ListMedicalCertificatesResponse.parse({ certificates: [], total: 0 }));
+    return;
+  }
 
-  if (isRestrictedRole(jwtUser.role)) {
-    conditions.push(eq(medicalCertificatesTable.userId, jwtUser.userId));
-  } else if (params.data.userId) {
-    conditions.push(eq(medicalCertificatesTable.userId, params.data.userId));
+  const conditions: SQL[] = [];
+  if (scopedUserIds !== null) {
+    conditions.push(inArray(medicalCertificatesTable.userId, scopedUserIds));
   }
 
   if (params.data.verificationStatus) {
@@ -70,8 +77,7 @@ router.post("/medical-certificates", requireAuth, async (req, res): Promise<void
 
   const jwtUser = req.user!;
 
-  // Workers and drivers can only upload MCs for themselves
-  if (isRestrictedRole(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
+  if (!["admin", "hr"].includes(jwtUser.role) && parsed.data.userId !== jwtUser.userId) {
     res.status(403).json({ error: "Forbidden: can only upload MC for yourself" });
     return;
   }
@@ -107,7 +113,7 @@ router.get("/medical-certificates/:id", requireAuth, async (req, res): Promise<v
   }
 
   const jwtUser = req.user!;
-  if (isRestrictedRole(jwtUser.role) && cert.userId !== jwtUser.userId) {
+  if (!(await canAccessUserId(jwtUser, cert.userId))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -129,11 +135,20 @@ router.patch("/medical-certificates/:id", requireAuth, requireRole("admin", "hr"
     return;
   }
 
+  const jwtUser = req.user!;
+
   const updateData: Partial<typeof medicalCertificatesTable.$inferInsert> = {};
-  if (body.data.verificationStatus) updateData.verificationStatus = body.data.verificationStatus as McVerificationStatus;
-  if (body.data.verificationNotes) updateData.verificationNotes = body.data.verificationNotes;
-  if (body.data.doctorName) updateData.doctorName = body.data.doctorName;
-  if (body.data.clinicName) updateData.clinicName = body.data.clinicName;
+  if (body.data.verificationStatus) {
+    updateData.verificationStatus = body.data.verificationStatus as McVerificationStatus;
+    // Stamp reviewer when verification status changes to verified or suspicious
+    if (["verified", "suspicious", "unreadable"].includes(body.data.verificationStatus)) {
+      updateData.verifiedBy = jwtUser.userId;
+      updateData.verifiedAt = new Date();
+    }
+  }
+  if (body.data.verificationNotes !== undefined) updateData.verificationNotes = body.data.verificationNotes;
+  if (body.data.doctorName !== undefined) updateData.doctorName = body.data.doctorName;
+  if (body.data.clinicName !== undefined) updateData.clinicName = body.data.clinicName;
 
   const [cert] = await db.update(medicalCertificatesTable)
     .set(updateData)
@@ -146,6 +161,25 @@ router.patch("/medical-certificates/:id", requireAuth, requireRole("admin", "hr"
   }
 
   res.json(UpdateMedicalCertificateResponse.parse(mapCert(cert)));
+});
+
+// POST /medical-certificates/check-expiry — triggers expiry scan and alert creation (admin/HR only)
+// Designed to be called by a scheduled cron job. Optionally accepts { expiryDays?: number }.
+router.post("/medical-certificates/check-expiry", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
+  const expiryDays = req.body?.expiryDays !== undefined ? parseInt(req.body.expiryDays, 10) : 7;
+  if (isNaN(expiryDays) || expiryDays < 1 || expiryDays > 90) {
+    res.status(400).json({ error: "expiryDays must be between 1 and 90" });
+    return;
+  }
+
+  const result = await checkMcExpiry(expiryDays);
+  res.json({
+    expiringSoon: result.expiringSoon,
+    alreadyExpired: result.alreadyExpired,
+    alertsCreated: result.alertsCreated,
+    skipped: result.skipped,
+    message: `Scan complete. ${result.alertsCreated} alert(s) created.`,
+  });
 });
 
 export default router;

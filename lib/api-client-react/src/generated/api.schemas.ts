@@ -22,11 +22,21 @@ export interface LoginRequest {
   password: string;
 }
 
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export const UserRole = {
+  admin: "admin",
+  hr: "hr",
+  manager: "manager",
+  driver: "driver",
+  worker: "worker",
+} as const;
+
 export interface UserResponse {
   id: number;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   employeeId?: string | null;
   departmentId?: number | null;
   phone?: string | null;
@@ -48,21 +58,11 @@ export interface UserListResponse {
   total: number;
 }
 
-export type CreateUserRequestRole =
-  (typeof CreateUserRequestRole)[keyof typeof CreateUserRequestRole];
-
-export const CreateUserRequestRole = {
-  admin: "admin",
-  hr: "hr",
-  driver: "driver",
-  worker: "worker",
-} as const;
-
 export interface CreateUserRequest {
   name: string;
   email: string;
   password: string;
-  role: CreateUserRequestRole;
+  role: UserRole;
   employeeId?: string;
   departmentId?: number;
   phone?: string;
@@ -70,20 +70,10 @@ export interface CreateUserRequest {
   hourlyRate?: string;
 }
 
-export type UpdateUserRequestRole =
-  (typeof UpdateUserRequestRole)[keyof typeof UpdateUserRequestRole];
-
-export const UpdateUserRequestRole = {
-  admin: "admin",
-  hr: "hr",
-  driver: "driver",
-  worker: "worker",
-} as const;
-
 export interface UpdateUserRequest {
   name?: string;
   email?: string;
-  role?: UpdateUserRequestRole;
+  role?: UserRole;
   employeeId?: string;
   departmentId?: number;
   phone?: string;
@@ -295,6 +285,9 @@ export interface MedicalCertificateResponse {
   mcEndDate?: string | null;
   verificationStatus: string;
   verificationNotes?: string | null;
+  verifiedBy?: number | null;
+  verifiedAt?: string | null;
+  reminderSentAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -338,6 +331,17 @@ export interface UpdateMedicalCertificateRequest {
   leaveApplicationId?: number;
 }
 
+export type AlertResponseStatus =
+  (typeof AlertResponseStatus)[keyof typeof AlertResponseStatus];
+
+export const AlertResponseStatus = {
+  new: "new",
+  acknowledged: "acknowledged",
+  in_progress: "in_progress",
+  resolved: "resolved",
+  dismissed: "dismissed",
+} as const;
+
 export interface AlertResponse {
   id: number;
   userId?: number | null;
@@ -345,10 +349,16 @@ export interface AlertResponse {
   severity: string;
   title: string;
   message: string;
-  status: string;
+  status: AlertResponseStatus;
   relatedDate?: string | null;
+  assignedTo?: number | null;
+  assignedBy?: number | null;
+  assignedAt?: string | null;
   resolvedBy?: number | null;
   resolvedAt?: string | null;
+  resolutionNotes?: string | null;
+  dismissedBy?: number | null;
+  dismissedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -368,6 +378,8 @@ export const CreateAlertRequestAlertType = {
   policy_violation: "policy_violation",
   ghost_worker: "ghost_worker",
   leave_limit_exceeded: "leave_limit_exceeded",
+  mc_expiring_soon: "mc_expiring_soon",
+  mc_expired: "mc_expired",
 } as const;
 
 export type CreateAlertRequestSeverity =
@@ -392,13 +404,17 @@ export type UpdateAlertRequestStatus =
   (typeof UpdateAlertRequestStatus)[keyof typeof UpdateAlertRequestStatus];
 
 export const UpdateAlertRequestStatus = {
-  active: "active",
+  new: "new",
+  acknowledged: "acknowledged",
+  in_progress: "in_progress",
   resolved: "resolved",
   dismissed: "dismissed",
 } as const;
 
 export interface UpdateAlertRequest {
   status?: UpdateAlertRequestStatus;
+  assignedTo?: number;
+  resolutionNotes?: string;
 }
 
 export interface ProductivityScoreResponse {
@@ -418,6 +434,64 @@ export interface ProductivityScoreResponse {
 export interface ProductivityListResponse {
   scores: ProductivityScoreResponse[];
   total: number;
+}
+
+export interface CalculateProductivityRequest {
+  userId: number;
+  year?: number;
+  month?: number;
+}
+
+export interface CalculateProductivityResponse {
+  success: boolean;
+  score: ProductivityScoreResponse;
+  message: string;
+}
+
+export interface CalculateAllProductivityRequest {
+  year?: number;
+  month?: number;
+}
+
+export interface CalculateAllProductivityFailure {
+  userId: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface CalculateAllProductivitySummary {
+  total: number;
+  successful: number;
+  failed: number;
+  year: number;
+  month: number;
+}
+
+export interface CalculateAllProductivityResponse {
+  success: boolean;
+  summary: CalculateAllProductivitySummary;
+  results?: CalculateAllProductivityFailure[];
+}
+
+export interface ProductivityReportDetails {
+  totalDays: number;
+  presentDays: number;
+  lateDays: number;
+  absentDays: number;
+  halfDays: number;
+  totalHoursWorked: number;
+  averageCheckInTime?: string | null;
+}
+
+export interface ProductivityReportPeriod {
+  year: number;
+  month: number;
+}
+
+export interface ProductivityReportResponse {
+  score: ProductivityScoreResponse;
+  details: ProductivityReportDetails;
+  period: ProductivityReportPeriod;
 }
 
 export interface RoleResponse {
@@ -512,6 +586,189 @@ export interface RegisterFaceRequest {
   faceDescriptor: string;
 }
 
+export type AttendanceExceptionResponseExceptionType =
+  (typeof AttendanceExceptionResponseExceptionType)[keyof typeof AttendanceExceptionResponseExceptionType];
+
+export const AttendanceExceptionResponseExceptionType = {
+  missed_checkout: "missed_checkout",
+  camera_unavailable: "camera_unavailable",
+  face_mismatch: "face_mismatch",
+  manual_correction: "manual_correction",
+  dispute: "dispute",
+} as const;
+
+export type AttendanceExceptionResponseStatus =
+  (typeof AttendanceExceptionResponseStatus)[keyof typeof AttendanceExceptionResponseStatus];
+
+export const AttendanceExceptionResponseStatus = {
+  open: "open",
+  under_review: "under_review",
+  approved: "approved",
+  rejected: "rejected",
+  escalated: "escalated",
+} as const;
+
+export interface AttendanceExceptionResponse {
+  id: number;
+  userId: number;
+  attendanceLogId?: number | null;
+  exceptionType: AttendanceExceptionResponseExceptionType;
+  status: AttendanceExceptionResponseStatus;
+  requestedBy: number;
+  reviewedBy?: number | null;
+  reviewedAt?: string | null;
+  reason: string;
+  reviewNotes?: string | null;
+  evidenceUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttendanceExceptionListResponse {
+  exceptions: AttendanceExceptionResponse[];
+  total: number;
+}
+
+export type CreateAttendanceExceptionRequestExceptionType =
+  (typeof CreateAttendanceExceptionRequestExceptionType)[keyof typeof CreateAttendanceExceptionRequestExceptionType];
+
+export const CreateAttendanceExceptionRequestExceptionType = {
+  missed_checkout: "missed_checkout",
+  camera_unavailable: "camera_unavailable",
+  face_mismatch: "face_mismatch",
+  manual_correction: "manual_correction",
+  dispute: "dispute",
+} as const;
+
+export interface CreateAttendanceExceptionRequest {
+  userId: number;
+  attendanceLogId?: number;
+  exceptionType: CreateAttendanceExceptionRequestExceptionType;
+  reason: string;
+  evidenceUrl?: string;
+}
+
+export type UpdateAttendanceExceptionRequestStatus =
+  (typeof UpdateAttendanceExceptionRequestStatus)[keyof typeof UpdateAttendanceExceptionRequestStatus];
+
+export const UpdateAttendanceExceptionRequestStatus = {
+  under_review: "under_review",
+  approved: "approved",
+  rejected: "rejected",
+  escalated: "escalated",
+} as const;
+
+export interface UpdateAttendanceExceptionRequest {
+  status?: UpdateAttendanceExceptionRequestStatus;
+  reviewNotes?: string;
+}
+
+export type FaceVerificationAttemptResponseAttemptType =
+  (typeof FaceVerificationAttemptResponseAttemptType)[keyof typeof FaceVerificationAttemptResponseAttemptType];
+
+export const FaceVerificationAttemptResponseAttemptType = {
+  check_in: "check_in",
+  check_out: "check_out",
+  registration: "registration",
+} as const;
+
+export type FaceVerificationAttemptResponseOutcome =
+  (typeof FaceVerificationAttemptResponseOutcome)[keyof typeof FaceVerificationAttemptResponseOutcome];
+
+export const FaceVerificationAttemptResponseOutcome = {
+  success: "success",
+  failure: "failure",
+  fallback_used: "fallback_used",
+} as const;
+
+export type FaceVerificationAttemptResponseFailureReason =
+  | (typeof FaceVerificationAttemptResponseFailureReason)[keyof typeof FaceVerificationAttemptResponseFailureReason]
+  | null;
+
+export const FaceVerificationAttemptResponseFailureReason = {
+  no_face: "no_face",
+  low_lighting: "low_lighting",
+  mismatch: "mismatch",
+  camera_unavailable: "camera_unavailable",
+  quality_insufficient: "quality_insufficient",
+} as const;
+
+export interface FaceVerificationAttemptResponse {
+  id: number;
+  userId: number;
+  attendanceLogId?: number | null;
+  attemptType: FaceVerificationAttemptResponseAttemptType;
+  outcome: FaceVerificationAttemptResponseOutcome;
+  failureReason?: FaceVerificationAttemptResponseFailureReason;
+  confidenceScore?: number | null;
+  fallbackMethod?: string | null;
+  reviewedBy?: number | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface FaceVerificationAttemptListResponse {
+  attempts: FaceVerificationAttemptResponse[];
+  total: number;
+}
+
+export type CreateFaceVerificationAttemptRequestAttemptType =
+  (typeof CreateFaceVerificationAttemptRequestAttemptType)[keyof typeof CreateFaceVerificationAttemptRequestAttemptType];
+
+export const CreateFaceVerificationAttemptRequestAttemptType = {
+  check_in: "check_in",
+  check_out: "check_out",
+  registration: "registration",
+} as const;
+
+export type CreateFaceVerificationAttemptRequestOutcome =
+  (typeof CreateFaceVerificationAttemptRequestOutcome)[keyof typeof CreateFaceVerificationAttemptRequestOutcome];
+
+export const CreateFaceVerificationAttemptRequestOutcome = {
+  success: "success",
+  failure: "failure",
+  fallback_used: "fallback_used",
+} as const;
+
+export type CreateFaceVerificationAttemptRequestFailureReason =
+  (typeof CreateFaceVerificationAttemptRequestFailureReason)[keyof typeof CreateFaceVerificationAttemptRequestFailureReason];
+
+export const CreateFaceVerificationAttemptRequestFailureReason = {
+  no_face: "no_face",
+  low_lighting: "low_lighting",
+  mismatch: "mismatch",
+  camera_unavailable: "camera_unavailable",
+  quality_insufficient: "quality_insufficient",
+} as const;
+
+export interface CreateFaceVerificationAttemptRequest {
+  userId: number;
+  attendanceLogId?: number;
+  attemptType: CreateFaceVerificationAttemptRequestAttemptType;
+  outcome: CreateFaceVerificationAttemptRequestOutcome;
+  failureReason?: CreateFaceVerificationAttemptRequestFailureReason;
+  confidenceScore?: number;
+  fallbackMethod?: string;
+  notes?: string;
+}
+
+export interface UpdateFaceVerificationAttemptRequest {
+  notes?: string;
+  reviewed?: boolean;
+}
+
+export interface CheckMcExpiryResponse {
+  /** Number of certificates found expiring within the window */
+  expiringSoon?: number;
+  /** Number of certificates already past their mcEndDate */
+  alreadyExpired?: number;
+  /** Number of new alerts created */
+  alertsCreated?: number;
+  /** Number of certificates skipped (already had open alerts) */
+  skipped?: number;
+  message?: string;
+}
+
 export type ListUsersParams = {
   role?: string;
   departmentId?: number;
@@ -548,17 +805,48 @@ export type ListMedicalCertificatesParams = {
   verificationStatus?: string;
 };
 
+export type CheckMcExpiryBody = {
+  /**
+   * Number of days ahead to consider "expiring soon". Defaults to 7. Range 1-90.
+   * @minimum 1
+   * @maximum 90
+   */
+  expiryDays?: number;
+};
+
 export type ListAlertsParams = {
   userId?: number;
   alertType?: string;
   status?: string;
   severity?: string;
+  assignedTo?: number;
+};
+
+export type ListAttendanceExceptionsParams = {
+  userId?: number;
+  status?: string;
+  exceptionType?: string;
+};
+
+export type ListFaceVerificationAttemptsParams = {
+  userId?: number;
+  outcome?: string;
+  attemptType?: string;
+};
+
+export type ListFaceVerificationAttemptsByUserParams = {
+  limit?: number;
 };
 
 export type ListProductivityScoresParams = {
   userId?: number;
   month?: string;
   year?: string;
+};
+
+export type GetProductivityReportParams = {
+  month?: number;
+  year?: number;
 };
 
 export type ListWorkersParams = {

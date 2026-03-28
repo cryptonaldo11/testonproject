@@ -1,0 +1,61 @@
+{
+  "config": {
+    "enabled": true,
+    "lastGenerated": "2026-03-26T14:00:23.030Z",
+    "observationCount": 10,
+    "skillCount": 0,
+    "domain": "config",
+    "triggerGlobs": [
+      "**/*.yaml",
+      "**/*.yml",
+      "**/*.json",
+      "**/*.toml"
+    ],
+    "description": "Config for backup. 2 conventions."
+  },
+  "project": {
+    "enabled": true,
+    "lastGenerated": "2026-03-26T14:00:23.026Z",
+    "observationCount": 9,
+    "skillCount": 0,
+    "domain": "project",
+    "triggerGlobs": [
+      "**/*"
+    ],
+    "description": "Project for backup. 1 gotchas, 1 conventions."
+  },
+  "typescript": {
+    "enabled": true,
+    "lastGenerated": "2026-03-26T14:00:23.030Z",
+    "observationCount": 166,
+    "skillCount": 0,
+    "domain": "typescript",
+    "triggerGlobs": [
+      "**/*.ts",
+      "**/*.tsx"
+    ],
+    "description": "Typescript for backup. 1 gotchas, 1 conventions, 9 fixes."
+  },
+  "problem-fix": {
+    "enabled": true,
+    "lastGenerated": "2026-03-26T14:00:23.031Z",
+    "observationCount": 0,
+    "skillCount": 2,
+    "domain": "problem-fix",
+    "triggerGlobs": [
+      "**/*"
+    ],
+    "description": "Problem Fix for backup. 1 error→fix pairs."
+  },
+  "typescript-react": {
+    "enabled": true,
+    "lastGenerated": "2026-03-26T14:00:23.026Z",
+    "observationCount": 2,
+    "skillCount": 0,
+    "domain": "typescript-react",
+    "triggerGlobs": [
+      "**/*.tsx"
+    ],
+    "description": "Typescript React for backup. ."
+  }
+}

@@ -5,6 +5,7 @@
  * Teston HR Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { AlertResponseStatus } from "./alertResponseStatus";
 
 export interface AlertResponse {
   id: number;
@@ -13,10 +14,16 @@ export interface AlertResponse {
   severity: string;
   title: string;
   message: string;
-  status: string;
+  status: AlertResponseStatus;
   relatedDate?: string | null;
+  assignedTo?: number | null;
+  assignedBy?: number | null;
+  assignedAt?: Date | null;
   resolvedBy?: number | null;
   resolvedAt?: Date | null;
+  resolutionNotes?: string | null;
+  dismissedBy?: number | null;
+  dismissedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

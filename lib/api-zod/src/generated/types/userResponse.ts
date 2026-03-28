@@ -5,12 +5,13 @@
  * Teston HR Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserRole } from "./userRole";
 
 export interface UserResponse {
   id: number;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   employeeId?: string | null;
   departmentId?: number | null;
   phone?: string | null;

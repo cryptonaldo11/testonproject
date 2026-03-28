@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, type UserRole } from "@workspace/db";
-import { eq, and, SQL } from "drizzle-orm";
+import { eq, and, SQL, inArray } from "drizzle-orm";
 import {
   ListUsersQueryParams,
   ListUsersResponse,
@@ -12,7 +12,7 @@ import {
   UpdateUserResponse,
   DeleteUserParams,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole, hashPassword, isRestrictedRole } from "../lib/auth";
+import { requireAuth, requireRole, hashPassword, getScopedUserIds, canAccessUserId, canReadUsers } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -34,14 +34,29 @@ function mapUser(user: typeof usersTable.$inferSelect) {
   };
 }
 
-router.get("/users", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
+router.get("/users", requireAuth, async (req, res): Promise<void> => {
+  const jwtUser = req.user!;
+  if (!canReadUsers(jwtUser.role)) {
+    res.status(403).json({ error: "Forbidden: insufficient permissions" });
+    return;
+  }
+
   const params = ListUsersQueryParams.safeParse(req.query);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
+  const scopedUserIds = await getScopedUserIds(jwtUser);
+  if (scopedUserIds !== null && scopedUserIds.length === 0) {
+    res.json(ListUsersResponse.parse({ users: [], total: 0 }));
+    return;
+  }
+
   const conditions: SQL[] = [];
+  if (scopedUserIds !== null) {
+    conditions.push(inArray(usersTable.id, scopedUserIds));
+  }
   if (params.data.role) {
     conditions.push(eq(usersTable.role, params.data.role as UserRole));
   }
@@ -85,7 +100,7 @@ router.get("/users/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   const jwtUser = req.user!;
-  if (isRestrictedRole(jwtUser.role) && jwtUser.userId !== params.data.id) {
+  if (!(await canAccessUserId(jwtUser, params.data.id))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

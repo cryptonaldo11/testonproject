@@ -11,4 +11,5 @@ export type ListAlertsParams = {
   alertType?: string;
   status?: string;
   severity?: string;
+  assignedTo?: number;
 };

@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useGetAttendanceSummary, type AttendanceSummaryResponse } from "@workspace/api-client-react";
 import { Card, Input } from "@/components/ui/core";
+import { useAuth } from "@/lib/auth";
 import { FileDown, DollarSign, Clock } from "lucide-react";
 
 function exportToCsv(data: AttendanceSummaryResponse, startDate: string, endDate: string) {
@@ -39,10 +41,16 @@ function exportToCsv(data: AttendanceSummaryResponse, startDate: string, endDate
 }
 
 export default function ManHours() {
-  const [startDate, setStartDate] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const { hasPermission } = useAuth();
+  const canReadReports = hasPermission("reports:read:team");
+  const [startDate, setStartDate] = useState(new Date(new Date().setDate(1)).toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const { data: summaryData, isLoading } = useGetAttendanceSummary({ startDate, endDate });
+  const { data: summaryData, isLoading } = useGetAttendanceSummary({ startDate, endDate }, { query: { queryKey: ["attendance", "summary", startDate, endDate], enabled: canReadReports } });
+
+  if (!canReadReports) {
+    return <Redirect to="/dashboard" />;
+  }
 
   const handleExport = () => {
     if (!summaryData?.items?.length) return;
@@ -54,7 +62,7 @@ export default function ManHours() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">Man-Hours & Cost</h1>
-          <p className="text-muted-foreground">Financial summary based on attendance logs.</p>
+          <p className="text-muted-foreground">Financial summary for the employees in your visible scope.</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-auto" />

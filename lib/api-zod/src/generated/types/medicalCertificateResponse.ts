@@ -20,6 +20,9 @@ export interface MedicalCertificateResponse {
   mcEndDate?: string | null;
   verificationStatus: string;
   verificationNotes?: string | null;
+  verifiedBy?: number | null;
+  verifiedAt?: Date | null;
+  reminderSentAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

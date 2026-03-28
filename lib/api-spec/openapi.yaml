@@ -28,6 +28,10 @@ tags:
     description: Medical certificate management
   - name: alerts
     description: Alert management
+  - name: attendance-exceptions
+    description: Attendance exception workflow
+  - name: face-verification-attempts
+    description: Face verification audit logging
   - name: productivity
     description: Productivity scoring
   - name: storage
@@ -690,6 +694,45 @@ paths:
               schema:
                 $ref: "#/components/schemas/MedicalCertificateResponse"
 
+  /medical-certificates/check-expiry:
+    post:
+      operationId: checkMcExpiry
+      tags: [medical-certificates]
+      summary: Scan medical certificates and create expiry reminder alerts
+      description: Scans all certificates with mcEndDate within the specified window that have not yet received a reminder. Creates mc_expiring_soon or mc_expired alerts and stamps reminderSentAt. Intended for cron/scheduled invocation.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiryDays:
+                  type: number
+                  description: Number of days ahead to consider "expiring soon". Defaults to 7. Range 1-90.
+                  default: 7
+                  minimum: 1
+                  maximum: 90
+      responses:
+        "200":
+          description: Scan complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckMcExpiryResponse"
+        "400":
+          description: Invalid expiryDays
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden — admin or HR role required
+
   /alerts:
     get:
       operationId: listAlerts
@@ -712,6 +755,10 @@ paths:
           name: severity
           schema:
             type: string
+        - in: query
+          name: assignedTo
+          schema:
+            type: number
       responses:
         "200":
           description: Alerts
@@ -762,6 +809,203 @@ paths:
               schema:
                 $ref: "#/components/schemas/AlertResponse"
 
+  /attendance-exceptions:
+    get:
+      operationId: listAttendanceExceptions
+      tags: [attendance-exceptions]
+      summary: List attendance exceptions
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: exceptionType
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance exceptions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceExceptionListResponse"
+    post:
+      operationId: createAttendanceException
+      tags: [attendance-exceptions]
+      summary: Submit an attendance exception
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAttendanceExceptionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceExceptionResponse"
+
+  /attendance-exceptions/{id}:
+    get:
+      operationId: getAttendanceException
+      tags: [attendance-exceptions]
+      summary: Get an attendance exception
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Attendance exception
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceExceptionResponse"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateAttendanceException
+      tags: [attendance-exceptions]
+      summary: Update attendance exception (review/submit)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAttendanceExceptionRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceExceptionResponse"
+
+  /face-verification-attempts:
+    get:
+      operationId: listFaceVerificationAttempts
+      tags: [face-verification-attempts]
+      summary: List face verification attempts
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: number
+        - in: query
+          name: outcome
+          schema:
+            type: string
+        - in: query
+          name: attemptType
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Face verification attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceVerificationAttemptListResponse"
+    post:
+      operationId: createFaceVerificationAttempt
+      tags: [face-verification-attempts]
+      summary: Log a face verification attempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFaceVerificationAttemptRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceVerificationAttemptResponse"
+
+  /face-verification-attempts/user/{userId}:
+    get:
+      operationId: listFaceVerificationAttemptsByUser
+      tags: [face-verification-attempts]
+      summary: List face verification attempts for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: limit
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Face verification attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceVerificationAttemptListResponse"
+
+  /face-verification-attempts/{id}:
+    get:
+      operationId: getFaceVerificationAttempt
+      tags: [face-verification-attempts]
+      summary: Get a face verification attempt
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Face verification attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceVerificationAttemptResponse"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateFaceVerificationAttempt
+      tags: [face-verification-attempts]
+      summary: Update face verification attempt notes/review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFaceVerificationAttemptRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaceVerificationAttemptResponse"
+
   /productivity:
     get:
       operationId: listProductivityScores
@@ -806,6 +1050,71 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProductivityListResponse"
+
+  /productivity/calculate:
+    post:
+      operationId: calculateProductivity
+      tags: [productivity]
+      summary: Calculate productivity for a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateProductivityRequest"
+      responses:
+        "200":
+          description: Productivity calculated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculateProductivityResponse"
+
+  /productivity/calculate-all:
+    post:
+      operationId: calculateAllProductivity
+      tags: [productivity]
+      summary: Calculate productivity for all users
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateAllProductivityRequest"
+      responses:
+        "200":
+          description: Productivity calculated for all users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculateAllProductivityResponse"
+
+  /productivity/report/{userId}:
+    get:
+      operationId: getProductivityReport
+      tags: [productivity]
+      summary: Get detailed productivity report for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: month
+          schema:
+            type: number
+        - in: query
+          name: year
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Productivity report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductivityReportResponse"
 
   /storage/uploads/request-url:
     post:
@@ -1063,6 +1372,10 @@ components:
         - token
         - user
 
+    UserRole:
+      type: string
+      enum: [admin, hr, manager, driver, worker]
+
     UserResponse:
       type: object
       properties:
@@ -1073,7 +1386,7 @@ components:
         email:
           type: string
         role:
-          type: string
+          $ref: "#/components/schemas/UserRole"
         employeeId:
           type: string
           nullable: true
@@ -1132,8 +1445,7 @@ components:
         password:
           type: string
         role:
-          type: string
-          enum: [admin, hr, driver, worker]
+          $ref: "#/components/schemas/UserRole"
         employeeId:
           type: string
         departmentId:
@@ -1158,8 +1470,7 @@ components:
         email:
           type: string
         role:
-          type: string
-          enum: [admin, hr, driver, worker]
+          $ref: "#/components/schemas/UserRole"
         employeeId:
           type: string
         departmentId:
@@ -1582,6 +1893,17 @@ components:
         verificationNotes:
           type: string
           nullable: true
+        verifiedBy:
+          type: number
+          nullable: true
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reminderSentAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -1679,13 +2001,34 @@ components:
           type: string
         status:
           type: string
+          enum: [new, acknowledged, in_progress, resolved, dismissed]
         relatedDate:
           type: string
+          nullable: true
+        assignedTo:
+          type: number
+          nullable: true
+        assignedBy:
+          type: number
+          nullable: true
+        assignedAt:
+          type: string
+          format: date-time
           nullable: true
         resolvedBy:
           type: number
           nullable: true
         resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        resolutionNotes:
+          type: string
+          nullable: true
+        dismissedBy:
+          type: number
+          nullable: true
+        dismissedAt:
           type: string
           format: date-time
           nullable: true
@@ -1725,7 +2068,7 @@ components:
           type: number
         alertType:
           type: string
-          enum: [missing_attendance, missing_document, frequent_absence, policy_violation, ghost_worker, leave_limit_exceeded]
+          enum: [missing_attendance, missing_document, frequent_absence, policy_violation, ghost_worker, leave_limit_exceeded, mc_expiring_soon, mc_expired]
         severity:
           type: string
           enum: [info, warning, critical]
@@ -1745,7 +2088,11 @@ components:
       properties:
         status:
           type: string
-          enum: [active, resolved, dismissed]
+          enum: [new, acknowledged, in_progress, resolved, dismissed]
+        assignedTo:
+          type: number
+        resolutionNotes:
+          type: string
 
     ProductivityScoreResponse:
       type: object
@@ -1799,6 +2146,139 @@ components:
       required:
         - scores
         - total
+
+    CalculateProductivityRequest:
+      type: object
+      properties:
+        userId:
+          type: number
+        year:
+          type: number
+        month:
+          type: number
+      required:
+        - userId
+
+    CalculateProductivityResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        score:
+          $ref: "#/components/schemas/ProductivityScoreResponse"
+        message:
+          type: string
+      required:
+        - success
+        - score
+        - message
+
+    CalculateAllProductivityRequest:
+      type: object
+      properties:
+        year:
+          type: number
+        month:
+          type: number
+
+    CalculateAllProductivityFailure:
+      type: object
+      properties:
+        userId:
+          type: number
+        success:
+          type: boolean
+        error:
+          type: string
+      required:
+        - userId
+        - success
+
+    CalculateAllProductivitySummary:
+      type: object
+      properties:
+        total:
+          type: number
+        successful:
+          type: number
+        failed:
+          type: number
+        year:
+          type: number
+        month:
+          type: number
+      required:
+        - total
+        - successful
+        - failed
+        - year
+        - month
+
+    CalculateAllProductivityResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        summary:
+          $ref: "#/components/schemas/CalculateAllProductivitySummary"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalculateAllProductivityFailure"
+      required:
+        - success
+        - summary
+
+    ProductivityReportDetails:
+      type: object
+      properties:
+        totalDays:
+          type: number
+        presentDays:
+          type: number
+        lateDays:
+          type: number
+        absentDays:
+          type: number
+        halfDays:
+          type: number
+        totalHoursWorked:
+          type: number
+        averageCheckInTime:
+          type: string
+          nullable: true
+      required:
+        - totalDays
+        - presentDays
+        - lateDays
+        - absentDays
+        - halfDays
+        - totalHoursWorked
+
+    ProductivityReportPeriod:
+      type: object
+      properties:
+        year:
+          type: number
+        month:
+          type: number
+      required:
+        - year
+        - month
+
+    ProductivityReportResponse:
+      type: object
+      properties:
+        score:
+          $ref: "#/components/schemas/ProductivityScoreResponse"
+        details:
+          $ref: "#/components/schemas/ProductivityReportDetails"
+        period:
+          $ref: "#/components/schemas/ProductivityReportPeriod"
+      required:
+        - score
+        - details
+        - period
 
     RoleResponse:
       type: object
@@ -2001,3 +2481,197 @@ components:
           type: string
       required:
         - faceDescriptor
+
+    # Attendance Exception Workflow Schemas
+    AttendanceExceptionResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+        attendanceLogId:
+          type: number
+          nullable: true
+        exceptionType:
+          type: string
+          enum: [missed_checkout, camera_unavailable, face_mismatch, manual_correction, dispute]
+        status:
+          type: string
+          enum: [open, under_review, approved, rejected, escalated]
+        requestedBy:
+          type: number
+        reviewedBy:
+          type: number
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reason:
+          type: string
+        reviewNotes:
+          type: string
+          nullable: true
+        evidenceUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - exceptionType
+        - status
+        - requestedBy
+        - reason
+        - createdAt
+        - updatedAt
+
+    AttendanceExceptionListResponse:
+      type: object
+      properties:
+        exceptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttendanceExceptionResponse"
+        total:
+          type: number
+      required:
+        - exceptions
+        - total
+
+    CreateAttendanceExceptionRequest:
+      type: object
+      required: [userId, exceptionType, reason]
+      properties:
+        userId:
+          type: number
+        attendanceLogId:
+          type: number
+        exceptionType:
+          type: string
+          enum: [missed_checkout, camera_unavailable, face_mismatch, manual_correction, dispute]
+        reason:
+          type: string
+        evidenceUrl:
+          type: string
+
+    UpdateAttendanceExceptionRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [under_review, approved, rejected, escalated]
+        reviewNotes:
+          type: string
+
+    # Face Verification Attempt Schemas
+    FaceVerificationAttemptResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        userId:
+          type: number
+        attendanceLogId:
+          type: number
+          nullable: true
+        attemptType:
+          type: string
+          enum: [check_in, check_out, registration]
+        outcome:
+          type: string
+          enum: [success, failure, fallback_used]
+        failureReason:
+          type: string
+          enum: [no_face, low_lighting, mismatch, camera_unavailable, quality_insufficient]
+          nullable: true
+        confidenceScore:
+          type: number
+          nullable: true
+        fallbackMethod:
+          type: string
+          nullable: true
+        reviewedBy:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - attemptType
+        - outcome
+        - createdAt
+
+    FaceVerificationAttemptListResponse:
+      type: object
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FaceVerificationAttemptResponse"
+        total:
+          type: number
+      required:
+        - attempts
+        - total
+
+    CreateFaceVerificationAttemptRequest:
+      type: object
+      required: [userId, attemptType, outcome]
+      properties:
+        userId:
+          type: number
+        attendanceLogId:
+          type: number
+        attemptType:
+          type: string
+          enum: [check_in, check_out, registration]
+        outcome:
+          type: string
+          enum: [success, failure, fallback_used]
+        failureReason:
+          type: string
+          enum: [no_face, low_lighting, mismatch, camera_unavailable, quality_insufficient]
+        confidenceScore:
+          type: number
+        fallbackMethod:
+          type: string
+        notes:
+          type: string
+
+    UpdateFaceVerificationAttemptRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+        reviewed:
+          type: boolean
+
+    CheckMcExpiryResponse:
+      type: object
+      properties:
+        expiringSoon:
+          type: number
+          description: Number of certificates found expiring within the window
+        alreadyExpired:
+          type: number
+          description: Number of certificates already past their mcEndDate
+        alertsCreated:
+          type: number
+          description: Number of new alerts created
+        skipped:
+          type: number
+          description: Number of certificates skipped (already had open alerts)
+        message:
+          type: string

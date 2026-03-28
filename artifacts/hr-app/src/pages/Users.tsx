@@ -1,22 +1,33 @@
 import React from "react";
+import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListUsers } from "@workspace/api-client-react";
 import { Card, Badge, Button } from "@/components/ui/core";
+import { ADMIN_ONLY_ROLES, useAuth } from "@/lib/auth";
 import { UserPlus } from "lucide-react";
 
 export default function Users() {
-  const { data: usersData } = useListUsers();
+  const { hasRole, hasPermission } = useAuth();
+  const canReadUsers = hasPermission("users:read");
+  const isAdminOnly = hasRole(ADMIN_ONLY_ROLES);
+  const { data: usersData } = useListUsers(undefined, { query: { queryKey: ["users", "list"], enabled: canReadUsers } });
+
+  if (!canReadUsers) {
+    return <Redirect to="/dashboard" />;
+  }
 
   return (
     <DashboardLayout>
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-display font-bold">Employees</h1>
-          <p className="text-muted-foreground">Manage workforce accounts and roles.</p>
+          <p className="text-muted-foreground">View visible employee accounts and roles.</p>
         </div>
-        <Button>
-          <UserPlus className="w-5 h-5 mr-2" /> Add Employee
-        </Button>
+        {isAdminOnly && (
+          <Button>
+            <UserPlus className="w-5 h-5 mr-2" /> Add Employee
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -41,17 +52,17 @@ export default function Users() {
                   </td>
                   <td className="px-6 py-4">
                     <p>{u.email}</p>
-                    <p className="text-xs text-muted-foreground">{u.phone || '-'}</p>
+                    <p className="text-xs text-muted-foreground">{u.phone || "-"}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant={u.role === 'admin' ? 'default' : u.role === 'hr' ? 'secondary' : 'outline'} className="uppercase text-[10px]">
+                    <Badge variant={u.role === "admin" ? "default" : u.role === "hr" ? "secondary" : "outline"} className="uppercase text-[10px]">
                       {u.role}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 font-mono font-medium">${u.hourlyRate}</td>
                   <td className="px-6 py-4">
-                     <Badge variant={u.isActive === 'true' ? 'success' : 'destructive'}>
-                        {u.isActive === 'true' ? 'Active' : 'Inactive'}
+                     <Badge variant={u.isActive === "true" ? "success" : "destructive"}>
+                        {u.isActive === "true" ? "Active" : "Inactive"}
                      </Badge>
                   </td>
                   <td className="px-6 py-4 text-right">

@@ -7,3 +7,5 @@ export * from "./leaves";
 export * from "./medical_certificates";
 export * from "./alerts";
 export * from "./productivity";
+export * from "./attendance_exceptions";
+export * from "./face_verification_attempts";

@@ -29,7 +29,7 @@ export const LoginResponse = zod.object({
     id: zod.number(),
     name: zod.string(),
     email: zod.string(),
-    role: zod.string(),
+    role: zod.enum(["admin", "hr", "manager", "driver", "worker"]),
     employeeId: zod.string().nullish(),
     departmentId: zod.number().nullish(),
     phone: zod.string().nullish(),
@@ -56,7 +56,7 @@ export const GetMeResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   email: zod.string(),
-  role: zod.string(),
+  role: zod.enum(["admin", "hr", "manager", "driver", "worker"]),
   employeeId: zod.string().nullish(),
   departmentId: zod.number().nullish(),
   phone: zod.string().nullish(),
@@ -83,7 +83,7 @@ export const ListUsersResponse = zod.object({
       id: zod.number(),
       name: zod.string(),
       email: zod.string(),
-      role: zod.string(),
+      role: zod.enum(["admin", "hr", "manager", "driver", "worker"]),
       employeeId: zod.string().nullish(),
       departmentId: zod.number().nullish(),
       phone: zod.string().nullish(),
@@ -105,7 +105,7 @@ export const CreateUserBody = zod.object({
   name: zod.string(),
   email: zod.string(),
   password: zod.string(),
-  role: zod.enum(["admin", "hr", "driver", "worker"]),
+  role: zod.enum(["admin", "hr", "manager", "driver", "worker"]),
   employeeId: zod.string().optional(),
   departmentId: zod.number().optional(),
   phone: zod.string().optional(),
@@ -124,7 +124,7 @@ export const GetUserResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   email: zod.string(),
-  role: zod.string(),
+  role: zod.enum(["admin", "hr", "manager", "driver", "worker"]),
   employeeId: zod.string().nullish(),
   departmentId: zod.number().nullish(),
   phone: zod.string().nullish(),
@@ -146,7 +146,7 @@ export const UpdateUserParams = zod.object({
 export const UpdateUserBody = zod.object({
   name: zod.string().optional(),
   email: zod.string().optional(),
-  role: zod.enum(["admin", "hr", "driver", "worker"]).optional(),
+  role: zod.enum(["admin", "hr", "manager", "driver", "worker"]).optional(),
   employeeId: zod.string().optional(),
   departmentId: zod.number().optional(),
   phone: zod.string().optional(),
@@ -161,7 +161,7 @@ export const UpdateUserResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   email: zod.string(),
-  role: zod.string(),
+  role: zod.enum(["admin", "hr", "manager", "driver", "worker"]),
   employeeId: zod.string().nullish(),
   departmentId: zod.number().nullish(),
   phone: zod.string().nullish(),
@@ -563,6 +563,9 @@ export const ListMedicalCertificatesResponse = zod.object({
       mcEndDate: zod.string().nullish(),
       verificationStatus: zod.string(),
       verificationNotes: zod.string().nullish(),
+      verifiedBy: zod.number().nullish(),
+      verifiedAt: zod.date().nullish(),
+      reminderSentAt: zod.date().nullish(),
       createdAt: zod.date(),
       updatedAt: zod.date(),
     }),
@@ -607,6 +610,9 @@ export const GetMedicalCertificateResponse = zod.object({
   mcEndDate: zod.string().nullish(),
   verificationStatus: zod.string(),
   verificationNotes: zod.string().nullish(),
+  verifiedBy: zod.number().nullish(),
+  verifiedAt: zod.date().nullish(),
+  reminderSentAt: zod.date().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });
@@ -645,8 +651,49 @@ export const UpdateMedicalCertificateResponse = zod.object({
   mcEndDate: zod.string().nullish(),
   verificationStatus: zod.string(),
   verificationNotes: zod.string().nullish(),
+  verifiedBy: zod.number().nullish(),
+  verifiedAt: zod.date().nullish(),
+  reminderSentAt: zod.date().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
+});
+
+/**
+ * Scans all certificates with mcEndDate within the specified window that have not yet received a reminder. Creates mc_expiring_soon or mc_expired alerts and stamps reminderSentAt. Intended for cron/scheduled invocation.
+ * @summary Scan medical certificates and create expiry reminder alerts
+ */
+export const checkMcExpiryBodyExpiryDaysDefault = 7;
+export const checkMcExpiryBodyExpiryDaysMax = 90;
+
+export const CheckMcExpiryBody = zod.object({
+  expiryDays: zod
+    .number()
+    .min(1)
+    .max(checkMcExpiryBodyExpiryDaysMax)
+    .default(checkMcExpiryBodyExpiryDaysDefault)
+    .describe(
+      'Number of days ahead to consider \"expiring soon\". Defaults to 7. Range 1-90.',
+    ),
+});
+
+export const CheckMcExpiryResponse = zod.object({
+  expiringSoon: zod
+    .number()
+    .optional()
+    .describe("Number of certificates found expiring within the window"),
+  alreadyExpired: zod
+    .number()
+    .optional()
+    .describe("Number of certificates already past their mcEndDate"),
+  alertsCreated: zod
+    .number()
+    .optional()
+    .describe("Number of new alerts created"),
+  skipped: zod
+    .number()
+    .optional()
+    .describe("Number of certificates skipped (already had open alerts)"),
+  message: zod.string().optional(),
 });
 
 /**
@@ -657,6 +704,7 @@ export const ListAlertsQueryParams = zod.object({
   alertType: zod.coerce.string().optional(),
   status: zod.coerce.string().optional(),
   severity: zod.coerce.string().optional(),
+  assignedTo: zod.coerce.number().optional(),
 });
 
 export const ListAlertsResponse = zod.object({
@@ -668,10 +716,22 @@ export const ListAlertsResponse = zod.object({
       severity: zod.string(),
       title: zod.string(),
       message: zod.string(),
-      status: zod.string(),
+      status: zod.enum([
+        "new",
+        "acknowledged",
+        "in_progress",
+        "resolved",
+        "dismissed",
+      ]),
       relatedDate: zod.string().nullish(),
+      assignedTo: zod.number().nullish(),
+      assignedBy: zod.number().nullish(),
+      assignedAt: zod.date().nullish(),
       resolvedBy: zod.number().nullish(),
       resolvedAt: zod.date().nullish(),
+      resolutionNotes: zod.string().nullish(),
+      dismissedBy: zod.number().nullish(),
+      dismissedAt: zod.date().nullish(),
       createdAt: zod.date(),
       updatedAt: zod.date(),
     }),
@@ -691,6 +751,8 @@ export const CreateAlertBody = zod.object({
     "policy_violation",
     "ghost_worker",
     "leave_limit_exceeded",
+    "mc_expiring_soon",
+    "mc_expired",
   ]),
   severity: zod.enum(["info", "warning", "critical"]).optional(),
   title: zod.string(),
@@ -706,7 +768,11 @@ export const UpdateAlertParams = zod.object({
 });
 
 export const UpdateAlertBody = zod.object({
-  status: zod.enum(["active", "resolved", "dismissed"]).optional(),
+  status: zod
+    .enum(["new", "acknowledged", "in_progress", "resolved", "dismissed"])
+    .optional(),
+  assignedTo: zod.number().optional(),
+  resolutionNotes: zod.string().optional(),
 });
 
 export const UpdateAlertResponse = zod.object({
@@ -716,12 +782,319 @@ export const UpdateAlertResponse = zod.object({
   severity: zod.string(),
   title: zod.string(),
   message: zod.string(),
-  status: zod.string(),
+  status: zod.enum([
+    "new",
+    "acknowledged",
+    "in_progress",
+    "resolved",
+    "dismissed",
+  ]),
   relatedDate: zod.string().nullish(),
+  assignedTo: zod.number().nullish(),
+  assignedBy: zod.number().nullish(),
+  assignedAt: zod.date().nullish(),
   resolvedBy: zod.number().nullish(),
   resolvedAt: zod.date().nullish(),
+  resolutionNotes: zod.string().nullish(),
+  dismissedBy: zod.number().nullish(),
+  dismissedAt: zod.date().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
+});
+
+/**
+ * @summary List attendance exceptions
+ */
+export const ListAttendanceExceptionsQueryParams = zod.object({
+  userId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+  exceptionType: zod.coerce.string().optional(),
+});
+
+export const ListAttendanceExceptionsResponse = zod.object({
+  exceptions: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      attendanceLogId: zod.number().nullish(),
+      exceptionType: zod.enum([
+        "missed_checkout",
+        "camera_unavailable",
+        "face_mismatch",
+        "manual_correction",
+        "dispute",
+      ]),
+      status: zod.enum([
+        "open",
+        "under_review",
+        "approved",
+        "rejected",
+        "escalated",
+      ]),
+      requestedBy: zod.number(),
+      reviewedBy: zod.number().nullish(),
+      reviewedAt: zod.date().nullish(),
+      reason: zod.string(),
+      reviewNotes: zod.string().nullish(),
+      evidenceUrl: zod.string().nullish(),
+      createdAt: zod.date(),
+      updatedAt: zod.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Submit an attendance exception
+ */
+export const CreateAttendanceExceptionBody = zod.object({
+  userId: zod.number(),
+  attendanceLogId: zod.number().optional(),
+  exceptionType: zod.enum([
+    "missed_checkout",
+    "camera_unavailable",
+    "face_mismatch",
+    "manual_correction",
+    "dispute",
+  ]),
+  reason: zod.string(),
+  evidenceUrl: zod.string().optional(),
+});
+
+/**
+ * @summary Get an attendance exception
+ */
+export const GetAttendanceExceptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAttendanceExceptionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  attendanceLogId: zod.number().nullish(),
+  exceptionType: zod.enum([
+    "missed_checkout",
+    "camera_unavailable",
+    "face_mismatch",
+    "manual_correction",
+    "dispute",
+  ]),
+  status: zod.enum([
+    "open",
+    "under_review",
+    "approved",
+    "rejected",
+    "escalated",
+  ]),
+  requestedBy: zod.number(),
+  reviewedBy: zod.number().nullish(),
+  reviewedAt: zod.date().nullish(),
+  reason: zod.string(),
+  reviewNotes: zod.string().nullish(),
+  evidenceUrl: zod.string().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary Update attendance exception (review/submit)
+ */
+export const UpdateAttendanceExceptionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAttendanceExceptionBody = zod.object({
+  status: zod
+    .enum(["under_review", "approved", "rejected", "escalated"])
+    .optional(),
+  reviewNotes: zod.string().optional(),
+});
+
+export const UpdateAttendanceExceptionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  attendanceLogId: zod.number().nullish(),
+  exceptionType: zod.enum([
+    "missed_checkout",
+    "camera_unavailable",
+    "face_mismatch",
+    "manual_correction",
+    "dispute",
+  ]),
+  status: zod.enum([
+    "open",
+    "under_review",
+    "approved",
+    "rejected",
+    "escalated",
+  ]),
+  requestedBy: zod.number(),
+  reviewedBy: zod.number().nullish(),
+  reviewedAt: zod.date().nullish(),
+  reason: zod.string(),
+  reviewNotes: zod.string().nullish(),
+  evidenceUrl: zod.string().nullish(),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary List face verification attempts
+ */
+export const ListFaceVerificationAttemptsQueryParams = zod.object({
+  userId: zod.coerce.number().optional(),
+  outcome: zod.coerce.string().optional(),
+  attemptType: zod.coerce.string().optional(),
+});
+
+export const ListFaceVerificationAttemptsResponse = zod.object({
+  attempts: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      attendanceLogId: zod.number().nullish(),
+      attemptType: zod.enum(["check_in", "check_out", "registration"]),
+      outcome: zod.enum(["success", "failure", "fallback_used"]),
+      failureReason: zod
+        .enum([
+          "no_face",
+          "low_lighting",
+          "mismatch",
+          "camera_unavailable",
+          "quality_insufficient",
+        ])
+        .nullish(),
+      confidenceScore: zod.number().nullish(),
+      fallbackMethod: zod.string().nullish(),
+      reviewedBy: zod.number().nullish(),
+      notes: zod.string().nullish(),
+      createdAt: zod.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Log a face verification attempt
+ */
+export const CreateFaceVerificationAttemptBody = zod.object({
+  userId: zod.number(),
+  attendanceLogId: zod.number().optional(),
+  attemptType: zod.enum(["check_in", "check_out", "registration"]),
+  outcome: zod.enum(["success", "failure", "fallback_used"]),
+  failureReason: zod
+    .enum([
+      "no_face",
+      "low_lighting",
+      "mismatch",
+      "camera_unavailable",
+      "quality_insufficient",
+    ])
+    .optional(),
+  confidenceScore: zod.number().optional(),
+  fallbackMethod: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+/**
+ * @summary List face verification attempts for a user
+ */
+export const ListFaceVerificationAttemptsByUserParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const ListFaceVerificationAttemptsByUserQueryParams = zod.object({
+  limit: zod.coerce.number().optional(),
+});
+
+export const ListFaceVerificationAttemptsByUserResponse = zod.object({
+  attempts: zod.array(
+    zod.object({
+      id: zod.number(),
+      userId: zod.number(),
+      attendanceLogId: zod.number().nullish(),
+      attemptType: zod.enum(["check_in", "check_out", "registration"]),
+      outcome: zod.enum(["success", "failure", "fallback_used"]),
+      failureReason: zod
+        .enum([
+          "no_face",
+          "low_lighting",
+          "mismatch",
+          "camera_unavailable",
+          "quality_insufficient",
+        ])
+        .nullish(),
+      confidenceScore: zod.number().nullish(),
+      fallbackMethod: zod.string().nullish(),
+      reviewedBy: zod.number().nullish(),
+      notes: zod.string().nullish(),
+      createdAt: zod.date(),
+    }),
+  ),
+  total: zod.number(),
+});
+
+/**
+ * @summary Get a face verification attempt
+ */
+export const GetFaceVerificationAttemptParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetFaceVerificationAttemptResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  attendanceLogId: zod.number().nullish(),
+  attemptType: zod.enum(["check_in", "check_out", "registration"]),
+  outcome: zod.enum(["success", "failure", "fallback_used"]),
+  failureReason: zod
+    .enum([
+      "no_face",
+      "low_lighting",
+      "mismatch",
+      "camera_unavailable",
+      "quality_insufficient",
+    ])
+    .nullish(),
+  confidenceScore: zod.number().nullish(),
+  fallbackMethod: zod.string().nullish(),
+  reviewedBy: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.date(),
+});
+
+/**
+ * @summary Update face verification attempt notes/review
+ */
+export const UpdateFaceVerificationAttemptParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateFaceVerificationAttemptBody = zod.object({
+  notes: zod.string().optional(),
+  reviewed: zod.boolean().optional(),
+});
+
+export const UpdateFaceVerificationAttemptResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  attendanceLogId: zod.number().nullish(),
+  attemptType: zod.enum(["check_in", "check_out", "registration"]),
+  outcome: zod.enum(["success", "failure", "fallback_used"]),
+  failureReason: zod
+    .enum([
+      "no_face",
+      "low_lighting",
+      "mismatch",
+      "camera_unavailable",
+      "quality_insufficient",
+    ])
+    .nullish(),
+  confidenceScore: zod.number().nullish(),
+  fallbackMethod: zod.string().nullish(),
+  reviewedBy: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  createdAt: zod.date(),
 });
 
 /**
@@ -776,6 +1149,102 @@ export const GetUserProductivityResponse = zod.object({
     }),
   ),
   total: zod.number(),
+});
+
+/**
+ * @summary Calculate productivity for a user
+ */
+export const CalculateProductivityBody = zod.object({
+  userId: zod.number(),
+  year: zod.number().optional(),
+  month: zod.number().optional(),
+});
+
+export const CalculateProductivityResponse = zod.object({
+  success: zod.boolean(),
+  score: zod.object({
+    id: zod.number(),
+    userId: zod.number(),
+    score: zod.string(),
+    attendanceRate: zod.string(),
+    punctualityRate: zod.string(),
+    leaveFrequency: zod.string(),
+    month: zod.string(),
+    year: zod.string(),
+    notes: zod.string().nullish(),
+    createdAt: zod.date(),
+    updatedAt: zod.date(),
+  }),
+  message: zod.string(),
+});
+
+/**
+ * @summary Calculate productivity for all users
+ */
+export const CalculateAllProductivityBody = zod.object({
+  year: zod.number().optional(),
+  month: zod.number().optional(),
+});
+
+export const CalculateAllProductivityResponse = zod.object({
+  success: zod.boolean(),
+  summary: zod.object({
+    total: zod.number(),
+    successful: zod.number(),
+    failed: zod.number(),
+    year: zod.number(),
+    month: zod.number(),
+  }),
+  results: zod
+    .array(
+      zod.object({
+        userId: zod.number(),
+        success: zod.boolean(),
+        error: zod.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get detailed productivity report for a user
+ */
+export const GetProductivityReportParams = zod.object({
+  userId: zod.coerce.number(),
+});
+
+export const GetProductivityReportQueryParams = zod.object({
+  month: zod.coerce.number().optional(),
+  year: zod.coerce.number().optional(),
+});
+
+export const GetProductivityReportResponse = zod.object({
+  score: zod.object({
+    id: zod.number(),
+    userId: zod.number(),
+    score: zod.string(),
+    attendanceRate: zod.string(),
+    punctualityRate: zod.string(),
+    leaveFrequency: zod.string(),
+    month: zod.string(),
+    year: zod.string(),
+    notes: zod.string().nullish(),
+    createdAt: zod.date(),
+    updatedAt: zod.date(),
+  }),
+  details: zod.object({
+    totalDays: zod.number(),
+    presentDays: zod.number(),
+    lateDays: zod.number(),
+    absentDays: zod.number(),
+    halfDays: zod.number(),
+    totalHoursWorked: zod.number(),
+    averageCheckInTime: zod.string().nullish(),
+  }),
+  period: zod.object({
+    year: zod.number(),
+    month: zod.number(),
+  }),
 });
 
 /**

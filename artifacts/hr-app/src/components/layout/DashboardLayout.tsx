@@ -1,15 +1,20 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/lib/auth";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Clock, 
-  CalendarDays, 
-  FileText, 
-  Building2, 
-  Bell, 
-  LogOut, 
+import {
+  ADMIN_HR_ROLES,
+  ADMIN_ONLY_ROLES,
+  SELF_SERVICE_ROLES,
+  useAuth,
+} from "@/lib/auth";
+import {
+  LayoutDashboard,
+  Users,
+  Clock,
+  CalendarDays,
+  FileText,
+  Building2,
+  Bell,
+  LogOut,
   Menu,
   Activity,
   BarChart3,
@@ -19,32 +24,34 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, hasPermission } = useAuth();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   if (!user) return null;
 
-  const isAdmin = hasRole(["admin"]);
-  const isHR = hasRole(["hr", "admin"]);
+  const isAdminOnly = hasRole(ADMIN_ONLY_ROLES);
+  const isAdminHR = hasRole(ADMIN_HR_ROLES);
+  const canReadReports = hasPermission("reports:read:team");
+  const canReadUsers = hasPermission("users:read");
+  const isSelfServiceAttendanceUser = hasRole(SELF_SERVICE_ROLES);
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
-    { label: "Check In/Out", href: "/attendance/checkin", icon: Clock, show: !isAdmin }, // Admins rarely clock in
+    { label: "Check In/Out", href: "/attendance/checkin", icon: Clock, show: isSelfServiceAttendanceUser },
     { label: "Attendance Logs", href: "/attendance", icon: CalendarDays, show: true },
     { label: "Leave Requests", href: "/leaves", icon: FileText, show: true },
     { label: "Medical Certs", href: "/medical-certificates", icon: FileText, show: true },
-    { label: "Man-Hours Report", href: "/reports/manhours", icon: BarChart3, show: isHR },
+    { label: "Man-Hours Report", href: "/reports/manhours", icon: BarChart3, show: canReadReports },
     { label: "Productivity", href: "/productivity", icon: Activity, show: true },
-    { label: "Employees", href: "/users", icon: Users, show: isAdmin },
-    { label: "Departments", href: "/departments", icon: Building2, show: isAdmin },
-    { label: "Face Registration", href: "/face-registration", icon: ScanFace, show: isHR },
+    { label: "Employees", href: "/users", icon: Users, show: canReadUsers },
+    { label: "Departments", href: "/departments", icon: Building2, show: isAdminOnly },
+    { label: "Face Registration", href: "/face-registration", icon: ScanFace, show: isAdminHR },
     { label: "Alerts", href: "/alerts", icon: Bell, show: true },
   ].filter(item => item.show);
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 bg-card border-b sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white font-bold">T</div>
@@ -55,7 +62,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </button>
       </div>
 
-      {/* Sidebar */}
       <AnimatePresence>
         {(sidebarOpen || window.innerWidth >= 768) && (
           <motion.aside
@@ -81,14 +87,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {navItems.map((item) => {
                 const isActive = location === item.href || (location.startsWith(item.href) && item.href !== "/dashboard");
                 return (
-                  <Link 
-                    key={item.href} 
+                  <Link
+                    key={item.href}
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group",
-                      isActive 
-                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                         : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                     )}
                   >
@@ -116,7 +122,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
       <main className="flex-1 min-w-0 overflow-y-auto">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
           <motion.div
@@ -129,9 +134,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </main>
 
-      {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />

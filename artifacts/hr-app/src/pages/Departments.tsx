@@ -1,11 +1,19 @@
 import React from "react";
+import { Redirect } from "wouter";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useListDepartments } from "@workspace/api-client-react";
 import { Card, Button } from "@/components/ui/core";
+import { ADMIN_ONLY_ROLES, useAuth } from "@/lib/auth";
 import { Building2, Plus } from "lucide-react";
 
 export default function Departments() {
-  const { data: deptData } = useListDepartments();
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole(ADMIN_ONLY_ROLES);
+  const { data: deptData } = useListDepartments({ query: { queryKey: ["departments", "admin"], enabled: isAdmin } });
+
+  if (!isAdmin) {
+    return <Redirect to="/dashboard" />;
+  }
 
   return (
     <DashboardLayout>
