@@ -27,6 +27,59 @@
 
 ## 2. Verified successful live checks
 
+### Deployment Record (2026-03-30)
+
+**Deployment summary — Operations cockpit + Phase 4A / PRD2.1 rollout**
+
+| Component | Target | Status |
+|-----------|--------|--------|
+| **GitHub frontend branch** | `master` | ✅ Pushed — commit `c191be42e4908f0771017c60176572bd93311e22` |
+| **GitHub backend branch** | `deploy` | ✅ Pushed — commit `c191be42e4908f0771017c60176572bd93311e22` |
+| **Frontend Pages deploy** | Cloudflare Pages (`teston-hr-app`) | ✅ Deployed — `https://79f43989.teston-hr-app.pages.dev` |
+| **API deploy** | Render (`teston-api`) | ✅ Live — deploy `dep-d750eg9r0fns73d5a370` |
+| **Database schema** | Neon Postgres (`testonHRdb`) | ✅ Production schema push applied via `pnpm --filter @workspace/db run push` |
+
+**Deployed commit:**
+- `c191be42e4908f0771017c60176572bd93311e22`
+- Commit message: `feat: ship operations cockpit and phase 4A workflows`
+
+**Deployment actions performed:**
+- verified production build with `VITE_API_BASE_URL=https://api.testonlandscape.online`
+- pushed deployable code to `master` and `deploy`
+- deployed frontend explicitly to Cloudflare Pages from `artifacts/hr-app/dist/public`
+- triggered new Render deploy for `teston-api`
+- confirmed Render service env keys were present: `PORT`, `NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`
+- applied production DB schema changes directly against Neon using the Render `DATABASE_URL`
+
+**Production issue found and fixed during rollout:**
+1. **Split-origin frontend API bug**
+   - Some frontend pages still used raw relative `/api/...` fetches, which would fail against Cloudflare Pages in production.
+   - Fixed before release in:
+     - `artifacts/hr-app/src/pages/Attendance.tsx`
+     - `artifacts/hr-app/src/pages/CheckIn.tsx`
+     - `artifacts/hr-app/src/pages/Interventions.tsx`
+2. **Interventions endpoint returned HTTP 500 after backend deploy**
+   - Root cause: production database schema had not yet been updated for the new interventions-related tables/shape.
+   - Fix: ran `pnpm --filter @workspace/db run push` against production Neon.
+   - Result: `GET /api/interventions` returned valid JSON afterward.
+
+**Live checks completed successfully after deployment:**
+- `https://www.testonlandscape.online` returned HTTP 200
+- `https://teston-hr-app.pages.dev` returned HTTP 200
+- `https://api.testonlandscape.online/api/healthz` returned HTTP 200 with `{"status":"ok"}`
+- seeded admin production login worked against:
+  - `https://api.testonlandscape.online`
+  - `https://teston-api.onrender.com`
+- authenticated `GET /api/auth/me` worked
+- authenticated `GET /api/leaves` worked
+- authenticated paginated `GET /api/users?page=1&pageSize=5` worked
+- authenticated `GET /api/anomalies` worked
+- authenticated `GET /api/interventions` worked after production schema push
+- `GET /api/operational-control/summary` returned auth JSON (`401 Unauthorized`) when unauthenticated, confirming the route is mounted in the deployed backend
+
+**Deployment note:**
+- The base path `/api/operational-control` is **not** the implemented route. The deployed route is `/api/operational-control/summary`.
+
 The following production checks succeeded during the working deployment session:
 
 - `https://www.testonlandscape.online` returned HTTP 200
