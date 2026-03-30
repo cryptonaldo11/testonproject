@@ -7,6 +7,14 @@
 export type AnomalyType = "attendance" | "leave" | "productivity" | "compliance";
 export type AnomalySeverity = "info" | "warning" | "critical";
 
+export interface AnomalyEvidence {
+  key: string;
+  label: string;
+  value: string;
+  numericValue?: number;
+  threshold?: string;
+}
+
 export interface Anomaly {
   id: string;
   type: AnomalyType;
@@ -16,6 +24,9 @@ export interface Anomaly {
   message: string;
   detail: string;
   detectedAt: string;
+  ruleKey?: string;
+  recommendations?: string[];
+  evidence?: AnomalyEvidence[];
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +267,7 @@ export interface DetectAllAnomaliesParams {
   leaves?: LeaveRecord[];
   productivityScores?: ProductivityScore[];
   userLabelMap?: Map<number, string>;
+  month?: string;
 }
 
 function applyLabels(anomalies: Anomaly[], labelMap?: Map<number, string>): Anomaly[] {
@@ -275,8 +287,8 @@ const SEVERITY_ORDER: Record<AnomalySeverity, number> = {
  * Sorts by severity then by userId.
  */
 export function detectAllAnomalies(params: DetectAllAnomaliesParams): Anomaly[] {
-  const attendanceAnomalies = detectAttendanceAnomalies(params.attendanceLogs ?? []);
-  const leaveAnomalies = detectLeaveAnomalies(params.leaves ?? []);
+  const attendanceAnomalies = detectAttendanceAnomalies(params.attendanceLogs ?? [], 0.8, params.month);
+  const leaveAnomalies = detectLeaveAnomalies(params.leaves ?? [], params.month);
   const productivityAnomalies = detectProductivityAnomalies(params.productivityScores ?? []);
 
   const all = [...attendanceAnomalies, ...leaveAnomalies, ...productivityAnomalies];

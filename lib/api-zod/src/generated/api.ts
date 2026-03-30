@@ -71,10 +71,24 @@ export const GetMeResponse = zod.object({
 /**
  * @summary List all users
  */
+
+export const listUsersQueryPageSizeMax = 100;
+
 export const ListUsersQueryParams = zod.object({
   role: zod.coerce.string().optional(),
   departmentId: zod.coerce.number().optional(),
   isActive: zod.coerce.boolean().optional(),
+  page: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe("1-based page index for server-driven pagination."),
+  pageSize: zod.coerce
+    .number()
+    .min(1)
+    .max(listUsersQueryPageSizeMax)
+    .optional()
+    .describe("Number of users to return per page."),
 });
 
 export const ListUsersResponse = zod.object({
@@ -96,6 +110,9 @@ export const ListUsersResponse = zod.object({
     }),
   ),
   total: zod.number(),
+  page: zod.number(),
+  pageSize: zod.number(),
+  totalPages: zod.number(),
 });
 
 /**
@@ -773,6 +790,7 @@ export const UpdateAlertBody = zod.object({
     .optional(),
   assignedTo: zod.number().optional(),
   resolutionNotes: zod.string().optional(),
+  handoffNote: zod.string().optional(),
 });
 
 export const UpdateAlertResponse = zod.object({
@@ -800,6 +818,43 @@ export const UpdateAlertResponse = zod.object({
   dismissedAt: zod.date().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
+});
+
+export const CollaborationCommentResponse = zod.object({
+  id: zod.number(),
+  workflowType: zod.enum(["alert", "attendance_exception"]),
+  recordId: zod.number(),
+  authorId: zod.number(),
+  body: zod.string(),
+  mentionedUserIds: zod.array(zod.number()),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+export const CollaborationCommentListResponse = zod.object({
+  comments: zod.array(CollaborationCommentResponse),
+  total: zod.number(),
+});
+
+export const CreateCollaborationCommentBody = zod.object({
+  body: zod.string(),
+  mentionedUserIds: zod.array(zod.number()).optional(),
+});
+
+export const OwnershipHandoffResponse = zod.object({
+  id: zod.number(),
+  workflowType: zod.enum(["alert", "attendance_exception"]),
+  recordId: zod.number(),
+  fromUserId: zod.number().nullish(),
+  toUserId: zod.number(),
+  handedOffBy: zod.number(),
+  note: zod.string().nullish(),
+  createdAt: zod.date(),
+});
+
+export const OwnershipHandoffListResponse = zod.object({
+  handoffs: zod.array(OwnershipHandoffResponse),
+  total: zod.number(),
 });
 
 /**
@@ -832,6 +887,9 @@ export const ListAttendanceExceptionsResponse = zod.object({
         "escalated",
       ]),
       requestedBy: zod.number(),
+      assignedTo: zod.number().nullish(),
+      assignedBy: zod.number().nullish(),
+      assignedAt: zod.date().nullish(),
       reviewedBy: zod.number().nullish(),
       reviewedAt: zod.date().nullish(),
       reason: zod.string(),
@@ -887,6 +945,9 @@ export const GetAttendanceExceptionResponse = zod.object({
     "escalated",
   ]),
   requestedBy: zod.number(),
+  assignedTo: zod.number().nullish(),
+  assignedBy: zod.number().nullish(),
+  assignedAt: zod.date().nullish(),
   reviewedBy: zod.number().nullish(),
   reviewedAt: zod.date().nullish(),
   reason: zod.string(),
@@ -908,6 +969,8 @@ export const UpdateAttendanceExceptionBody = zod.object({
     .enum(["under_review", "approved", "rejected", "escalated"])
     .optional(),
   reviewNotes: zod.string().optional(),
+  assignedTo: zod.number().optional(),
+  handoffNote: zod.string().optional(),
 });
 
 export const UpdateAttendanceExceptionResponse = zod.object({
@@ -929,6 +992,9 @@ export const UpdateAttendanceExceptionResponse = zod.object({
     "escalated",
   ]),
   requestedBy: zod.number(),
+  assignedTo: zod.number().nullish(),
+  assignedBy: zod.number().nullish(),
+  assignedAt: zod.date().nullish(),
   reviewedBy: zod.number().nullish(),
   reviewedAt: zod.date().nullish(),
   reason: zod.string(),
@@ -1294,9 +1360,104 @@ export const ListAnomaliesResponse = zod.object({
       message: zod.string().describe("Short human-readable summary"),
       detail: zod.string().describe("Detailed explanation of the anomaly"),
       detectedAt: zod.date(),
+      ruleKey: zod.string().nullish(),
+      recommendations: zod.array(zod.string()).nullish(),
+      evidence: zod
+        .array(
+          zod.object({
+            key: zod.string(),
+            label: zod.string(),
+            value: zod.string(),
+            numericValue: zod.number().nullish(),
+            threshold: zod.string().nullish(),
+          }),
+        )
+        .nullish(),
     }),
   ),
   total: zod.number(),
+});
+
+/**
+ * @summary Get operational control queue summary
+ */
+export const GetOperationalControlSummaryQueryParams = zod.object({
+  workflow: zod.enum(["alerts", "attendance_exceptions", "medical_certificates"]).optional(),
+});
+
+const OperationalControlBreachRiskSummary = zod.object({
+  atRiskCount: zod.number(),
+  dueWithin4HoursCount: zod.number(),
+  dueWithin8HoursCount: zod.number(),
+  dueWithin24HoursCount: zod.number(),
+});
+
+const OperationalControlOldestItem = zod.object({
+  itemId: zod.number(),
+  ownerId: zod.number().nullish(),
+  ownerName: zod.string().nullish(),
+  status: zod.string(),
+  ageHours: zod.number(),
+  resolutionDueAt: zod.date(),
+});
+
+const OperationalControlOwnerLoad = zod.object({
+  ownerId: zod.number().nullish(),
+  ownerName: zod.string(),
+  activeCount: zod.number(),
+  overdueCount: zod.number(),
+  oldestItemAgeHours: zod.number(),
+});
+
+const OperationalControlPriorityItem = zod.object({
+  workflow: zod.enum(["alerts", "attendance_exceptions", "medical_certificates"]),
+  itemId: zod.number(),
+  userId: zod.number().nullish(),
+  ownerId: zod.number().nullish(),
+  ownerName: zod.string().nullish(),
+  status: zod.string(),
+  ageHours: zod.number(),
+  responseBreached: zod.boolean(),
+  resolutionBreached: zod.boolean(),
+  resolutionDueAt: zod.date(),
+  priorityScore: zod.number(),
+});
+
+export const GetOperationalControlSummaryResponse = zod.object({
+  asOf: zod.date(),
+  workflowFilter: zod.enum(["alerts", "attendance_exceptions", "medical_certificates"]).nullish(),
+  workflows: zod.array(
+    zod.object({
+      workflow: zod.enum(["alerts", "attendance_exceptions", "medical_certificates"]),
+      queueLabel: zod.string(),
+      sla: zod.object({
+        responseHours: zod.number(),
+        resolutionHours: zod.number(),
+      }),
+      backlogCount: zod.number(),
+      overdueCount: zod.number(),
+      responseBreachedCount: zod.number(),
+      slaAttainmentRate: zod.number(),
+      averageAgeHours: zod.number(),
+      oldestOpenItem: OperationalControlOldestItem.nullish(),
+      agingBuckets: zod.object({
+        "0_24h": zod.number(),
+        "24_48h": zod.number(),
+        "48_72h": zod.number(),
+        "72h_plus": zod.number(),
+      }),
+      ownerLoad: zod.array(OperationalControlOwnerLoad),
+      breachRiskSummary: OperationalControlBreachRiskSummary,
+      topPriorityItems: zod.array(OperationalControlPriorityItem),
+    }),
+  ),
+  totals: zod.object({
+    backlogCount: zod.number(),
+    overdueCount: zod.number(),
+    responseBreachedCount: zod.number(),
+    breachRiskSummary: OperationalControlBreachRiskSummary,
+  }),
+  priorityQueue: zod.array(OperationalControlPriorityItem),
 });
 
 /**

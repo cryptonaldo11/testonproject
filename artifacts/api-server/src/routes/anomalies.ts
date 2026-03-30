@@ -168,6 +168,7 @@ router.get("/anomalies", requireAuth, requireRole("admin", "hr", "manager"), asy
     leaves,
     productivityScores,
     userLabelMap,
+    month: monthLabel,
   });
 
   // -------------------------------------------------------------------------

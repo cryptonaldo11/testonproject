@@ -9,3 +9,6 @@ export * from "./alerts";
 export * from "./productivity";
 export * from "./attendance_exceptions";
 export * from "./face_verification_attempts";
+export * from "./collaboration_comments";
+export * from "./ownership_handoffs";
+export * from "./interventions";

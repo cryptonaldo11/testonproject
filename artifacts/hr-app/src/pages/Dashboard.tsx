@@ -1,10 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ADMIN_HR_ROLES, MANAGER_ROLES, SELF_SERVICE_ROLES, useAuth } from "@/lib/auth";
+import { trackKpiEvent } from "@/lib/kpiTracking";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Clock, CalendarX, TrendingUp, TrendingDown, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare, Sparkles } from "lucide-react";
-import { useListUsers, useListAttendance, useListLeaves, useListAlerts, useListMedicalCertificates, useListProductivityScores, useGetLeaveBalance, useGetAttendanceSummary, useGetProductivityReport, useListAttendanceExceptions, useListFaceVerificationAttemptsByUser } from "@workspace/api-client-react";
+import { Users, Clock, CalendarX, TrendingUp, TrendingDown, AlertTriangle, FileText, Activity, CalendarDays, ShieldAlert, CheckSquare, Sparkles, Building2, ScanFace, ArrowRight } from "lucide-react";
+import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+} from "@/components/ui/ops-cockpit";
+import { useListUsers, useListWorkers, useListDepartments, useListAttendance, useListLeaves, useListAlerts, useListMedicalCertificates, useListProductivityScores, useGetLeaveBalance, useGetAttendanceSummary, useListAttendanceExceptions, useListFaceVerificationAttemptsByUser } from "@workspace/api-client-react";
 import {
   computeWorkerSummary,
   computeManagerSummary,
@@ -62,6 +69,69 @@ interface TopPriorityItem {
   label: string;
   count: number;
   severity: string;
+}
+
+interface GoLiveChecklistItem {
+  label: string;
+  description: string;
+  done: boolean;
+  href: string;
+  cta: string;
+}
+
+function GoLiveCenter({ items, loading }: { items: GoLiveChecklistItem[]; loading: boolean }) {
+  const completed = items.filter((item) => item.done).length;
+  const progressPercent = items.length === 0 ? 0 : Math.round((completed / items.length) * 100);
+
+  return (
+    <Card className="mb-8 border-0 shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <CheckSquare className="h-5 w-5 text-primary" />
+              Go-Live Center
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Track setup readiness before rolling Phase 4A into wider internal use.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-secondary/20 px-4 py-3 text-right">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Readiness</p>
+            <p className="text-2xl font-display font-bold">{loading ? "—" : `${completed}/${items.length}`}</p>
+            <p className="text-xs text-muted-foreground">{loading ? "Loading status" : `${progressPercent}% complete`}</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {items.map((item) => (
+              <a key={item.label} href={item.href} className="rounded-xl border bg-secondary/20 p-4 transition-colors hover:bg-accent">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${item.done ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {item.done ? "Ready" : "Needs setup"}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between text-sm font-medium">
+                  <span>{item.cta}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function AISummaryCard({ summary, role }: { summary: WorkerSummary | ManagerSummary | AdminSummary; role: "worker" | "manager" | "admin" }) {
@@ -532,6 +602,10 @@ export default function Dashboard() {
   const isManager = hasRole(MANAGER_ROLES);
   const isSelfService = hasRole(SELF_SERVICE_ROLES);
 
+  useEffect(() => {
+    trackKpiEvent({ name: "dashboard_viewed", properties: { role: isAdminHR ? "admin_hr" : isManager ? "manager" : isSelfService ? "worker" : "unknown" } });
+  }, []);
+
   const today = new Date().toISOString().split("T")[0];
   const currentMonth = String(new Date().getMonth() + 1);
   const currentYear = String(new Date().getFullYear());
@@ -539,6 +613,8 @@ export default function Dashboard() {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   const { data: usersData, isLoading: usersLoading } = useListUsers({}, { query: { queryKey: ["dashboard", "users"], enabled: isAdminHR || isManager } });
+  const { data: workersData, isLoading: workersLoading } = useListWorkers(undefined, { query: { queryKey: ["dashboard", "workers"], enabled: isAdminHR } });
+  const { data: departmentsData, isLoading: departmentsLoading } = useListDepartments({ query: { queryKey: ["dashboard", "departments"], enabled: isAdminHR } });
   const { data: attendanceData, isLoading: attendanceLoading } = useListAttendance({ startDate: today, endDate: today });
   const { data: leavesData, isLoading: leavesLoading } = useListLeaves({ status: "pending" }, { query: { queryKey: ["dashboard", "leaves"], enabled: isAdminHR || isManager } });
   const { data: alertsData } = useListAlerts({}, { query: { queryKey: ["dashboard", "alerts"], enabled: true } });
@@ -638,6 +714,9 @@ export default function Dashboard() {
   }, [isAdminHR, alertsData, teamExceptions, certificatesData, productivityData]);
 
   const activeUsers = usersData?.users?.filter((u) => u.isActive === "true").length || 0;
+  const departmentsCount = departmentsData?.departments?.length || 0;
+  const workersCount = workersData?.workers?.length || 0;
+  const registeredWorkersCount = workersData?.workers?.filter((worker) => worker.hasFaceRegistered).length || 0;
   const presentToday = attendanceData?.logs?.filter((l) => l.status === "present").length || 0;
   const pendingLeaves = leavesData?.total || 0;
   const pendingCertificateReviews = certificatesData?.total || 0;
@@ -655,15 +734,70 @@ export default function Dashboard() {
     return map;
   }, [usersData?.users]);
 
+  const goLiveItems: GoLiveChecklistItem[] = [
+    {
+      label: "Departments configured",
+      description: departmentsCount > 0 ? `${departmentsCount} departments available for team scoping.` : "Set up departments before assigning teams and reporting lines.",
+      done: departmentsCount > 0,
+      href: "/departments",
+      cta: departmentsCount > 0 ? "Review departments" : "Set up departments",
+    },
+    {
+      label: "Employees imported",
+      description: activeUsers > 0 ? `${activeUsers} active employee accounts are available.` : "Add employees so they can log in and appear in operational workflows.",
+      done: activeUsers > 0,
+      href: "/users",
+      cta: activeUsers > 0 ? "Review employees" : "Add employees",
+    },
+    {
+      label: "Face registration started",
+      description: workersCount > 0 ? `${registeredWorkersCount} of ${workersCount} workers have registered face descriptors.` : "Enroll workers for biometric check-in and fallback coverage.",
+      done: workersCount > 0 && registeredWorkersCount > 0,
+      href: "/face-registration",
+      cta: registeredWorkersCount > 0 ? "Continue registration" : "Start registration",
+    },
+    {
+      label: "Operational workflows active",
+      description: openWorkflowAlerts > 0 || pendingCertificateReviews > 0 || presentToday > 0
+        ? `${openWorkflowAlerts} open alerts, ${pendingCertificateReviews} pending certificate reviews, ${presentToday} present today.`
+        : "Verify attendance, alerts, and certificate workflows before wider rollout.",
+      done: openWorkflowAlerts > 0 || pendingCertificateReviews > 0 || presentToday > 0,
+      href: pendingCertificateReviews > 0 ? "/medical-certificates" : "/alerts",
+      cta: pendingCertificateReviews > 0 ? "Review certificates" : "Review workflows",
+    },
+  ];
+
   return (
     <DashboardLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold">Welcome back, {user?.name}</h1>
-        <p className="text-muted-foreground mt-1">Here&apos;s what&apos;s happening today across your Teston workspace.</p>
-      </div>
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title={`Welcome back, ${user?.name}`}
+        description="See the clearest operational signals for your role first: status, emerging insight, and the fastest next action for today’s workforce work."
+      />
+
+      <OpsHero
+        badge={isAdminHR ? "Admin / HR control center" : isManager ? "Manager operations view" : "Worker daily view"}
+        icon={isAdminHR ? Building2 : isManager ? Activity : Clock}
+        tone={unresolvedCriticalAlerts > 0 ? "attention" : "default"}
+        title={isAdminHR ? "Coordinate workforce health, compliance, and readiness from one command surface." : isManager ? "Keep team attendance, productivity, and queue ownership aligned." : "See today’s work status, then act with confidence."}
+        description={isAdminHR
+          ? "The dashboard now frames open work as queues and readiness checks, without changing the data contracts behind attendance, alerts, certificates, or labor reporting."
+          : isManager
+            ? "Your role-aware view keeps the same team data, but now foregrounds the queues and risk indicators most likely to need a decision today."
+            : "Your personal view keeps existing self-service behavior while making leave balance, attendance, and next actions easier to understand at a glance."}
+      >
+        <OpsQueueNotice
+          tone={unresolvedCriticalAlerts > 0 ? "attention" : "default"}
+          title={isAdminHR || isManager ? `${unresolvedCriticalAlerts} critical alert${unresolvedCriticalAlerts === 1 ? "" : "s"} still open` : `${myPendingLeaveCount} pending leave request${myPendingLeaveCount === 1 ? "" : "s"}`}
+          description={isAdminHR || isManager
+            ? "Use critical signals and assigned work to decide where to intervene first, then capture notes in the relevant queue page."
+            : "Use the action buttons below to complete attendance, submit leave, or upload supporting documents without losing visibility into status."}
+        />
+      </OpsHero>
 
       {isAdminHR ? (
         <>
+          <GoLiveCenter items={goLiveItems} loading={usersLoading || workersLoading || departmentsLoading || attendanceLoading} />
           {usersLoading || attendanceLoading || leavesLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
@@ -683,11 +817,12 @@ export default function Dashboard() {
             <AISummaryCard summary={adminSummary} role="admin" />
           )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="lg:col-span-2 border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle>Workflow queue</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <OpsSection
+              title="Workflow queue"
+              description="Use queue counts to decide where intervention is needed first, then jump into the underlying workflow pages."
+              className="lg:col-span-2 border-0 shadow-lg"
+            >
+              <div className="space-y-4">
                 <div className="rounded-xl border bg-secondary/20 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
@@ -709,27 +844,27 @@ export default function Dashboard() {
                 <div className="rounded-xl border bg-secondary/20 p-4 text-sm text-muted-foreground">
                   Use alerts and certificate queues to assign ownership, capture review notes, and keep compliance work moving.
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </OpsSection>
 
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
-                <a href="/users" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
+                <a href="/users" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "review_employees", role: "admin_hr" } })}>
                   <Users className="w-5 h-5" />
                   Review employees
                 </a>
-                <a href="/medical-certificates" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/medical-certificates" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "review_certificates", role: "admin_hr" } })}>
                   <CheckSquare className="w-5 h-5" />
                   Review certificates
                 </a>
-                <a href="/alerts" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/alerts" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "investigate_alerts", role: "admin_hr" } })}>
                   <AlertTriangle className="w-5 h-5" />
                   Investigate alerts
                 </a>
-                <a href="/reports/manhours" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/reports/manhours" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "view_manhours", role: "admin_hr" } })}>
                   <CalendarDays className="w-5 h-5" />
                   View man-hours
                 </a>
@@ -784,19 +919,19 @@ export default function Dashboard() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
-                <a href="/attendance" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
+                <a href="/attendance" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "review_team_attendance", role: "manager" } })}>
                   <Clock className="w-5 h-5" />
                   Review team attendance
                 </a>
-                <a href="/alerts" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/alerts" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "work_assigned_alerts", role: "manager" } })}>
                   <AlertTriangle className="w-5 h-5" />
                   Work assigned alerts
                 </a>
-                <a href="/leaves" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/leaves" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "review_leave_requests", role: "manager" } })}>
                   <CalendarX className="w-5 h-5" />
                   Review leave requests
                 </a>
-                <a href="/productivity" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/productivity" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "review_team_productivity", role: "manager" } })}>
                   <Activity className="w-5 h-5" />
                   Review team productivity
                 </a>
@@ -868,11 +1003,11 @@ export default function Dashboard() {
                   <Clock className="w-5 h-5" />
                   Check In / Out
                 </a>
-                <a href="/leaves" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/leaves" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "apply_leave", role: "worker" } })}>
                   <CalendarX className="w-5 h-5" />
                   Apply for Leave
                 </a>
-                <a href="/medical-certificates" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold">
+                <a href="/medical-certificates" className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-input hover:bg-accent transition-colors font-semibold" onClick={() => trackKpiEvent({ name: "dashboard_quick_action_clicked", properties: { action: "upload_mc", role: "worker" } })}>
                   <FileText className="w-5 h-5" />
                   Upload MC
                 </a>

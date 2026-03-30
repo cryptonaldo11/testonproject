@@ -14,6 +14,8 @@ import storageRouter from "./storage";
 import attendanceExceptionsRouter from "./attendance_exceptions";
 import faceVerificationRouter from "./face_verification";
 import anomaliesRouter from "./anomalies";
+import operationalControlRouter from "./operational_control";
+import interventionsRouter from "./interventions";
 
 const router: IRouter = Router();
 
@@ -32,5 +34,7 @@ router.use(storageRouter);
 router.use(attendanceExceptionsRouter);
 router.use(faceVerificationRouter);
 router.use(anomaliesRouter);
+router.use(operationalControlRouter);
+router.use(interventionsRouter);
 
 export default router;

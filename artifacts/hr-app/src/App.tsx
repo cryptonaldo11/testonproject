@@ -1,6 +1,7 @@
 import React from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ShieldCheck } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -25,9 +26,29 @@ import Alerts from "@/pages/Alerts";
 import ManHours from "@/pages/ManHours";
 import Productivity from "@/pages/Productivity";
 import FaceRegistration from "@/pages/FaceRegistration";
+import Interventions from "@/pages/Interventions";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
+
+function AppLoadingScreen({ message = "Loading workspace access..." }: { message?: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.08),_transparent_35%),linear-gradient(180deg,_hsl(var(--background)),_hsl(var(--muted)/0.22))] px-6">
+      <div className="w-full max-w-md rounded-3xl border border-border/70 bg-card/85 p-8 text-center shadow-xl backdrop-blur">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20">
+          WO
+        </div>
+        <h1 className="mt-5 text-xl font-semibold tracking-tight">Workforce Operations</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Secure workforce oversight, compliance, and response workflows.</p>
+        <div className="mx-auto mt-6 h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-medium text-muted-foreground">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          {message}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function RequireAuth({
   component: Component,
@@ -42,11 +63,7 @@ function RequireAuth({
   const [location] = useLocation();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
+    return <AppLoadingScreen />;
   }
 
   if (!user) {
@@ -80,6 +97,7 @@ function Router() {
       <Route path="/departments" component={() => <RequireAuth component={Departments} roles={ADMIN_ONLY_ROLES} />} />
       <Route path="/alerts" component={() => <RequireAuth component={Alerts} />} />
       <Route path="/productivity" component={() => <RequireAuth component={Productivity} />} />
+      <Route path="/interventions" component={() => <RequireAuth component={Interventions} roles={ADMIN_HR_ROLES} />} />
       <Route path="/face-registration" component={() => <RequireAuth component={FaceRegistration} roles={ADMIN_HR_ROLES} />} />
       <Route component={NotFound} />
     </Switch>

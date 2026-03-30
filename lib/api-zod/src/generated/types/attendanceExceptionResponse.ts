@@ -15,6 +15,9 @@ export interface AttendanceExceptionResponse {
   exceptionType: AttendanceExceptionResponseExceptionType;
   status: AttendanceExceptionResponseStatus;
   requestedBy: number;
+  assignedTo?: number | null;
+  assignedBy?: number | null;
+  assignedAt?: Date | null;
   reviewedBy?: number | null;
   reviewedAt?: Date | null;
   reason: string;

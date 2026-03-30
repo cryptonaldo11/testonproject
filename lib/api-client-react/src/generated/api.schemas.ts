@@ -56,6 +56,9 @@ export interface AuthResponse {
 export interface UserListResponse {
   users: UserResponse[];
   total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface CreateUserRequest {
@@ -769,6 +772,14 @@ export interface CheckMcExpiryResponse {
   message?: string;
 }
 
+export interface AnomalyEvidence {
+  key: string;
+  label: string;
+  value: string;
+  numericValue?: number | null;
+  threshold?: string | null;
+}
+
 export type AnomalyType = (typeof AnomalyType)[keyof typeof AnomalyType];
 
 export const AnomalyType = {
@@ -799,6 +810,9 @@ export interface Anomaly {
   /** Detailed explanation of the anomaly */
   detail: string;
   detectedAt: string;
+  ruleKey?: string | null;
+  recommendations?: string[] | null;
+  evidence?: AnomalyEvidence[] | null;
 }
 
 export interface AnomalyListResponse {
@@ -810,6 +824,17 @@ export type ListUsersParams = {
   role?: string;
   departmentId?: number;
   isActive?: boolean;
+  /**
+   * 1-based page index for server-driven pagination.
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * Number of users to return per page.
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
 };
 
 export type ListAttendanceParams = {

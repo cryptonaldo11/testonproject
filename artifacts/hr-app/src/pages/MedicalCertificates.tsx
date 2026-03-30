@@ -9,6 +9,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge, Input, Label } from "@/components/ui/core";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/utils";
 import { OPERATIONAL_ROLES, ADMIN_HR_ROLES, useAuth } from "@/lib/auth";
-import { AlertTriangle, CheckCircle2, FileCheck2, Loader2, Upload, X, Filter, UserCheck, CalendarClock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileCheck2, Loader2, Upload, X, Filter, UserCheck, CalendarClock, SearchX, ShieldCheck, FileSearch, ShieldAlert } from "lucide-react";
+import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+  OpsStatCard,
+  OpsStatGrid,
+} from "@/components/ui/ops-cockpit";
 import { useUpload } from "@workspace/object-storage-web";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, "") ?? "";
@@ -100,6 +109,29 @@ export default function MedicalCertificates() {
       return true;
     });
   }, [mcData?.certificates, statusFilter, expiryFilter]);
+
+  const certificateSummary = useMemo(() => {
+    return (mcData?.certificates ?? []).reduce(
+      (summary, mc) => {
+        summary.total += 1;
+        if (mc.verificationStatus === "pending") summary.pending += 1;
+        if (mc.verificationStatus === "verified") summary.verified += 1;
+        if (mc.verificationStatus === "suspicious" || mc.verificationStatus === "unreadable") summary.needsFollowUp += 1;
+        const expiryInfo = getCertExpiryInfo(mc);
+        if (expiryInfo?.variant === "warning") summary.expiringSoon += 1;
+        if (expiryInfo?.variant === "destructive") summary.expired += 1;
+        return summary;
+      },
+      {
+        total: 0,
+        pending: 0,
+        verified: 0,
+        needsFollowUp: 0,
+        expiringSoon: 0,
+        expired: 0,
+      },
+    );
+  }, [mcData?.certificates]);
 
   const createMCMutation = useCreateMedicalCertificate({
     mutation: {
@@ -209,17 +241,36 @@ export default function MedicalCertificates() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Medical Certificates</h1>
-          <p className="text-muted-foreground">Upload and review medical documents in your visible scope.</p>
-        </div>
-        {!isAdminHR && (
-          <Button onClick={() => setIsUploading(!isUploading)}>
-            <Upload className="w-5 h-5 mr-2" /> Upload MC
-          </Button>
-        )}
-      </div>
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title="Medical certificates"
+        description="Manage certificate uploads, compliance review, expiry risk, and document trust signals while preserving existing upload, review, and document-access behavior."
+        actions={
+          !isAdminHR ? (
+            <Button onClick={() => setIsUploading(!isUploading)}>
+              <Upload className="w-5 h-5 mr-2" /> Upload MC
+            </Button>
+          ) : null
+        }
+      />
+
+      <OpsHero
+        badge={isAdminHR ? "Compliance review queue" : "My document record"}
+        icon={FileSearch}
+        tone={certificateSummary.expired > 0 || certificateSummary.needsFollowUp > 0 ? "attention" : "default"}
+        title={isAdminHR ? "Keep medical-document review explainable, timely, and auditable." : "Upload documents once, then follow the review outcome and coverage window."}
+        description={isAdminHR
+          ? "The page now highlights what matters operationally: pending reviews, expiry pressure, suspicious or unreadable documents, and the notes needed to justify decisions later."
+          : "Your upload and document links still work the same way, with clearer feedback about review status, coverage dates, and what HR is checking."}
+      >
+        <OpsQueueNotice
+          tone={certificateSummary.needsFollowUp > 0 ? "attention" : "default"}
+          title={isAdminHR ? `${certificateSummary.pending} pending review, ${certificateSummary.needsFollowUp} needing follow-up` : `${certificateSummary.total} certificate${certificateSummary.total === 1 ? "" : "s"} in view`}
+          description={isAdminHR
+            ? "Prioritize unreadable, suspicious, and expiring certificates so compliance actions happen before leave or attendance disputes escalate."
+            : "Review notes and verification status remain visible so you can understand whether more information is needed."}
+        />
+      </OpsHero>
 
       {feedback && (
         <div
@@ -239,8 +290,19 @@ export default function MedicalCertificates() {
         </Card>
       )}
 
+      <OpsStatGrid>
+        <OpsStatCard label="Pending review" value={certificateSummary.pending} hint="Certificates still awaiting verification." icon={FileSearch} tone={certificateSummary.pending > 0 ? "attention" : "success"} />
+        <OpsStatCard label="Expiring soon" value={certificateSummary.expiringSoon} hint="Coverage ending within seven days." icon={CalendarClock} tone={certificateSummary.expiringSoon > 0 ? "attention" : "default"} />
+        <OpsStatCard label="Expired" value={certificateSummary.expired} hint="Certificates whose coverage window has passed." icon={ShieldAlert} tone={certificateSummary.expired > 0 ? "critical" : "success"} />
+        <OpsStatCard label="Needs follow-up" value={certificateSummary.needsFollowUp} hint="Suspicious or unreadable records needing review action." icon={ShieldCheck} tone={certificateSummary.needsFollowUp > 0 ? "attention" : "default"} />
+      </OpsStatGrid>
+
       {isOperational && (
-        <Card className="mb-6 p-4">
+        <OpsSection
+          title="Queue filters"
+          description="Narrow the certificate queue by review status or expiry pressure without changing document access behavior."
+          className="mb-6"
+        >
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
@@ -310,18 +372,19 @@ export default function MedicalCertificates() {
               </div>
             </div>
           </div>
-        </Card>
+        </OpsSection>
       )}
 
       {isUploading && (
         <Card className="mb-8 border-primary/20 bg-primary/5">
           <div className="p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-display font-bold text-xl">Upload Medical Certificate</h3>
+              <h3 className="font-display font-bold text-xl">Upload medical certificate</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsUploading(false)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
+            <p className="mb-4 text-sm text-muted-foreground">Add clinic and coverage details now so the reviewer has enough context when the document enters the compliance queue.</p>
             <form onSubmit={handleUpload} className="grid grid-cols-1 gap-4">
               <div
                 className="border-2 border-dashed border-primary/30 rounded-xl p-8 text-center bg-white cursor-pointer hover:border-primary/50 transition-colors"
@@ -417,7 +480,13 @@ export default function MedicalCertificates() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <OpsSection
+        title={isAdminHR ? "Certificate review queue" : "My medical certificates"}
+        description={isAdminHR
+          ? "Review coverage windows, verification status, document trust signals, and reviewer notes before changing the record state."
+          : "Track uploaded certificates, coverage dates, and the latest reviewer outcome for each document."}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCerts.map((mc) => {
           const expiryInfo = getCertExpiryInfo(mc);
           return (
@@ -450,23 +519,30 @@ export default function MedicalCertificates() {
                 )}
               </div>
             </div>
-            <div className="p-5 text-sm space-y-2">
-              <div className="flex justify-between gap-4"><span className="text-muted-foreground">Employee:</span> <span className="font-medium text-right">{getEmployeeLabel(mc.userId)}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-muted-foreground">Clinic:</span> <span className="font-medium text-right">{mc.clinicName || "-"}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-muted-foreground">Doctor:</span> <span className="font-medium text-right">{mc.doctorName || "-"}</span></div>
-              {(mc.mcStartDate || mc.mcEndDate) && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Coverage:</span>
-                  <span className="font-medium text-right text-xs">
-                    {mc.mcStartDate ?? "?"} → {mc.mcEndDate ?? "?"}
-                  </span>
-                </div>
-              )}
+            <div className="p-5 text-sm space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border bg-background/70 px-3 py-2"><span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Employee</span><p className="mt-1 font-medium text-right sm:text-left">{getEmployeeLabel(mc.userId)}</p></div>
+                <div className="rounded-xl border bg-background/70 px-3 py-2"><span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coverage</span><p className="mt-1 font-medium text-right sm:text-left text-xs">{mc.mcStartDate ?? "?"} → {mc.mcEndDate ?? "?"}</p></div>
+                <div className="rounded-xl border bg-background/70 px-3 py-2"><span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Clinic</span><p className="mt-1 font-medium text-right sm:text-left">{mc.clinicName || "-"}</p></div>
+                <div className="rounded-xl border bg-background/70 px-3 py-2"><span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Doctor</span><p className="mt-1 font-medium text-right sm:text-left">{mc.doctorName || "-"}</p></div>
+              </div>
+              <div className="rounded-2xl border bg-background/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Review framing</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {mc.verificationStatus === "pending"
+                    ? "This document is still waiting for human verification before it should be treated as confirmed coverage."
+                    : mc.verificationStatus === "verified"
+                      ? "The document has been verified and remains in the record with reviewer attribution for auditability."
+                      : mc.verificationStatus === "suspicious"
+                        ? "The document needs follow-up because something about the submission does not align with expectations."
+                        : "The document could not be confidently reviewed and may require resubmission or manual clarification."}
+                </p>
+              </div>
               {mc.verificationNotes && (
-                <p className="pt-2 text-xs text-muted-foreground whitespace-pre-wrap">Review note: {mc.verificationNotes}</p>
+                <p className="pt-1 text-xs text-muted-foreground whitespace-pre-wrap">Review note: {mc.verificationNotes}</p>
               )}
               {mc.verifiedBy && mc.verifiedAt && (
-                <div className="pt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="pt-1 flex items-center gap-2 text-xs text-muted-foreground">
                   <UserCheck className="w-3 h-3" />
                   <span>Verified by {getEmployeeLabel(mc.verifiedBy)} on {formatDate(mc.verifiedAt)}</span>
                 </div>
@@ -513,11 +589,35 @@ export default function MedicalCertificates() {
           );
         })}
         {filteredCerts.length === 0 && (
-          <div className="col-span-full p-12 text-center text-muted-foreground border-2 border-dashed rounded-2xl">
-            No medical certificates match the current filters.
+          <div className="col-span-full">
+            <Empty className="py-16">
+              <EmptyMedia variant="icon">{isOperational ? <SearchX className="w-10 h-10" /> : <Upload className="w-10 h-10" />}</EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>{isOperational ? "No certificates match the current filters" : "No medical certificates uploaded yet"}</EmptyTitle>
+              </EmptyHeader>
+              <EmptyContent>
+                <EmptyDescription>
+                  {isOperational
+                    ? "Try clearing the status or expiry filters to review the full queue."
+                    : "Upload your first medical certificate so HR can review it and track expiry."}
+                </EmptyDescription>
+                <div className="flex gap-2">
+                  {isOperational ? (
+                    <Button variant="outline" size="sm" onClick={() => { setStatusFilter(""); setExpiryFilter(""); }}>
+                      Reset filters
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setIsUploading(true)}>
+                      Upload MC
+                    </Button>
+                  )}
+                </div>
+              </EmptyContent>
+            </Empty>
           </div>
         )}
       </div>
+      </OpsSection>
 
       <Dialog open={!!reviewTarget} onOpenChange={(open) => !open && setReviewTarget(null)}>
         <DialogContent>

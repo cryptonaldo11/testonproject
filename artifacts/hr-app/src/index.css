@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -29,69 +29,150 @@
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 6px);
 }
 
 :root {
-  /* Corporate Green & Clean White Theme */
-  --background: 140 20% 98%;
-  --foreground: 142 40% 10%;
-  
+  --background: 210 33% 98%;
+  --foreground: 220 28% 14%;
+
   --card: 0 0% 100%;
-  --card-foreground: 142 40% 10%;
-  
+  --card-foreground: 220 28% 14%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 142 40% 10%;
-  
-  /* Primary: Forest Green */
-  --primary: 142 71% 28%;
+  --popover-foreground: 220 28% 14%;
+
+  /* Brand green reserved for product identity and emphasis */
+  --primary: 151 58% 33%;
   --primary-foreground: 0 0% 100%;
-  
-  /* Secondary: Soft Sage */
-  --secondary: 142 30% 90%;
-  --secondary-foreground: 142 71% 28%;
-  
-  --muted: 142 20% 94%;
-  --muted-foreground: 142 15% 45%;
-  
-  --accent: 142 40% 92%;
-  --accent-foreground: 142 71% 28%;
-  
-  --destructive: 0 84% 60%;
+
+  --secondary: 150 24% 92%;
+  --secondary-foreground: 151 44% 24%;
+
+  --muted: 210 24% 95%;
+  --muted-foreground: 220 16% 42%;
+
+  --accent: 152 28% 94%;
+  --accent-foreground: 220 28% 14%;
+
+  --destructive: 0 74% 54%;
   --destructive-foreground: 0 0% 100%;
-  
-  --border: 142 20% 88%;
-  --input: 142 20% 88%;
-  --ring: 142 71% 28%;
-  
-  --radius: 0.75rem;
+
+  --border: 210 18% 87%;
+  --input: 210 20% 91%;
+  --ring: 151 58% 33%;
+
+  --success: 201 86% 41%;
+  --success-foreground: 0 0% 100%;
+  --warning: 37 92% 50%;
+  --warning-foreground: 24 25% 12%;
+  --info: 221 83% 56%;
+  --info-foreground: 0 0% 100%;
+
+  --surface-subtle: 150 28% 97%;
+  --surface-elevated: 0 0% 100%;
+  --surface-strong: 220 23% 18%;
+
+  --primary-border: hsl(151 46% 27%);
+  --secondary-border: hsl(150 22% 82%);
+  --destructive-border: hsl(0 68% 46%);
+  --button-outline: hsl(210 20% 82%);
+  --badge-outline: hsl(210 18% 84%);
+
+  --shadow-sm: 0 1px 2px hsl(220 40% 12% / 0.06);
+  --shadow-md: 0 12px 32px hsl(220 40% 12% / 0.08);
+  --shadow-lg: 0 24px 60px hsl(220 44% 10% / 0.14);
+
+  --radius: 1rem;
 }
 
 @layer base {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/20 selection:text-primary;
+
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
   }
-  h1, h2, h3, h4, h5, h6 {
+
+  body {
+    @apply min-h-screen bg-background text-foreground font-sans antialiased selection:bg-primary/15 selection:text-foreground;
+    background-image:
+      radial-gradient(circle at top, hsl(var(--primary) / 0.08), transparent 30%),
+      linear-gradient(180deg, hsl(var(--surface-subtle)) 0%, hsl(var(--background)) 35%);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
     @apply tracking-tight font-semibold text-foreground;
   }
+
+  h1 {
+    @apply text-3xl font-semibold md:text-4xl;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold md:text-[1.75rem];
+  }
+
+  h3 {
+    @apply text-xl font-semibold md:text-2xl;
+  }
+
+  p {
+    @apply leading-7;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.16);
+  }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@layer utilities {
+  .hover-elevate {
+    @apply transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)];
+  }
+
+  .active-elevate-2 {
+    @apply active:translate-y-0 active:shadow-[var(--shadow-sm)];
+  }
+
+  .shadow-xs {
+    box-shadow: var(--shadow-sm);
+  }
+
+  .shadow-premium {
+    box-shadow: var(--shadow-md);
+  }
+
+  .surface-panel {
+    background: linear-gradient(180deg, hsl(var(--surface-elevated)) 0%, hsl(var(--surface-subtle) / 0.7) 100%);
+  }
 }
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 4px;
+  background: hsl(var(--muted-foreground) / 0.24);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.42);
+  background-clip: padding-box;
 }

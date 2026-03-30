@@ -17,7 +17,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/utils";
 import { OPERATIONAL_ROLES, ADMIN_HR_ROLES, useAuth } from "@/lib/auth";
-import { Plus } from "lucide-react";
+import { Plus, CalendarClock, BrainCircuit, ShieldCheck } from "lucide-react";
+import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+  OpsStatCard,
+  OpsStatGrid,
+} from "@/components/ui/ops-cockpit";
 
 function employeeFallback(userId: number): string {
   return `Employee #${userId}`;
@@ -197,52 +205,76 @@ export default function Leaves() {
     });
   };
 
+  const pendingCount = (leavesData?.leaves ?? []).filter((leave) => leave.status === "pending").length;
+  const approvedCount = (leavesData?.leaves ?? []).filter((leave) => leave.status === "approved").length;
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Leave Management</h1>
-          <p className="text-muted-foreground">Manage and track leave applications in your visible scope.</p>
-        </div>
-        {!isAdminHR && (
-          <Button onClick={() => setIsApplying(!isApplying)}>
-            <Plus className="w-5 h-5 mr-2" /> Apply Leave
-          </Button>
-        )}
-      </div>
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title="Leave management"
+        description="Manage leave requests with clearer queue framing, explainable AI guidance, and review notes that preserve the current workflow and audit trail."
+        actions={
+          !isAdminHR ? (
+            <Button onClick={() => setIsApplying(!isApplying)}>
+              <Plus className="w-5 h-5 mr-2" /> Apply Leave
+            </Button>
+          ) : null
+        }
+      />
 
-      {isAdminHR && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Unclassified reasons</p>
-            <p className="mt-2 text-2xl font-bold">{analytics.unclassifiedCount}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">High-confidence mismatches</p>
-            <p className="mt-2 text-2xl font-bold">{analytics.mismatchCount}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Repeated patterns</p>
-            {analytics.repeatedReasons.length > 0 ? (
-              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {analytics.repeatedReasons.map((item) => (
-                  <div key={item.reason} className="flex justify-between gap-4">
-                    <span className="truncate">{item.reason}</span>
-                    <span className="font-medium text-foreground">×{item.count}</span>
-                  </div>
-                ))}
+      <OpsHero
+        badge={isAdminHR ? "Approval and risk review" : "My leave requests"}
+        icon={CalendarClock}
+        tone={isAdminHR && pendingCount > 0 ? "attention" : "default"}
+        title={isAdminHR ? "Review leave demand before it becomes a staffing or compliance issue." : "Submit leave with clear reasons, then follow the review outcome."}
+        description={isAdminHR
+          ? "AI hints remain advisory only. The page now surfaces where human review matters most: pending requests, strong type mismatches, and repeated reason patterns that may need extra context."
+          : "Your application flow is unchanged, but the page now explains how requests move through review and where notes from approvers will appear."}
+      >
+        <OpsQueueNotice
+          tone={isAdminHR && analytics.mismatchCount > 0 ? "attention" : "default"}
+          title={isAdminHR ? `${pendingCount} request${pendingCount === 1 ? "" : "s"} awaiting review` : `${pendingCount} request${pendingCount === 1 ? "" : "s"} still pending`}
+          description={isAdminHR
+            ? analytics.mismatchCount > 0
+              ? `${analytics.mismatchCount} high-confidence AI mismatch${analytics.mismatchCount === 1 ? "" : "es"} were detected. Use them as decision support, not as automatic verdicts.`
+              : "Use AI classification as explainability support while keeping the final decision with HR or management."
+            : "Pending requests remain visible until a reviewer approves or rejects them, with notes preserved for transparency."}
+        />
+      </OpsHero>
+
+      <OpsStatGrid>
+        <OpsStatCard label="Pending" value={pendingCount} hint={isAdminHR ? "Requests waiting for review." : "Your requests awaiting a decision."} icon={CalendarClock} tone={pendingCount > 0 ? "attention" : "success"} />
+        <OpsStatCard label="Approved" value={approvedCount} hint="Requests already cleared in the visible scope." icon={ShieldCheck} tone="success" />
+        {isAdminHR ? (
+          <>
+            <OpsStatCard label="AI unclassified" value={analytics.unclassifiedCount} hint="Reasons with low-confidence classification." icon={BrainCircuit} tone={analytics.unclassifiedCount > 0 ? "attention" : "default"} />
+            <OpsStatCard label="Mismatch signals" value={analytics.mismatchCount} hint="High-confidence differences between selected type and detected reason." icon={BrainCircuit} tone={analytics.mismatchCount > 0 ? "attention" : "success"} />
+          </>
+        ) : (
+          <OpsStatCard label="Total visible" value={totalLeaves} hint="Requests returned for your current role scope." icon={CalendarClock} />
+        )}
+      </OpsStatGrid>
+
+      {isAdminHR && analytics.repeatedReasons.length > 0 && (
+        <div className="mb-6 rounded-2xl border bg-secondary/20 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Pattern watch</p>
+          <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {analytics.repeatedReasons.map((item) => (
+              <div key={item.reason} className="flex justify-between gap-4 rounded-xl border bg-background/70 px-3 py-2">
+                <span className="truncate">{item.reason}</span>
+                <span className="font-medium text-foreground">×{item.count}</span>
               </div>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">No repeated reasons yet.</p>
-            )}
-          </Card>
+            ))}
+          </div>
         </div>
       )}
 
       {isApplying && (
         <Card className="mb-8 border-primary/20 bg-primary/5">
           <div className="p-6">
-            <h3 className="font-display font-bold text-xl mb-4">New Leave Application</h3>
+            <h3 className="font-display font-bold text-xl mb-2">New leave application</h3>
+            <p className="mb-4 text-sm text-muted-foreground">Provide enough context for a reviewer to understand the request quickly and document the decision clearly.</p>
             <form onSubmit={handleApply} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Leave Type</Label>
@@ -264,7 +296,7 @@ export default function Leaves() {
               </div>
               <div className="space-y-2">
                 <Label>Reason</Label>
-                <Input type="text" name="reason" placeholder="Detailed reason..." required />
+                <Input type="text" name="reason" placeholder="Explain the request clearly for review" required />
               </div>
               <div className="col-span-full flex justify-end gap-3 mt-4">
                 <Button type="button" variant="ghost" onClick={() => setIsApplying(false)}>Cancel</Button>
@@ -275,7 +307,12 @@ export default function Leaves() {
         </Card>
       )}
 
-      <Card>
+      <OpsSection
+        title={isAdminHR ? "Leave review queue" : "My leave requests"}
+        description={isAdminHR
+          ? "Review each request with date coverage, reason context, AI explanation, and optional notes for downstream auditability."
+          : "Track the status of your requests and review the notes that explain the final decision."}
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs">
@@ -299,20 +336,21 @@ export default function Leaves() {
                       {formatDate(leave.startDate)} <br />to {formatDate(leave.endDate)}
                       <span className="block mt-1 text-xs font-semibold text-foreground">{leave.totalDays} Days</span>
                     </td>
-                    <td className="px-6 py-4 max-w-[240px]">
+                    <td className="px-6 py-4 max-w-[280px]">
                       <div className="truncate" title={leave.reason}>{leave.reason}</div>
                       {isAdminHR && (leave.aiClassification || leave.aiConfidence) && (
-                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        <div className="mt-2 rounded-xl border bg-secondary/20 p-3 text-xs text-muted-foreground">
                           <p>
-                            AI suggestion: <span className="font-medium capitalize">{leave.aiClassification || "unclassified"}</span>
+                            AI suggestion: <span className="font-medium capitalize text-foreground">{leave.aiClassification || "unclassified"}</span>
                             {leave.aiConfidence ? ` • Confidence ${Math.round(Number(leave.aiConfidence) * 100)}%` : ""}
                           </p>
                           {hasStrongMismatch(leave.leaveType, leave.aiClassification, leave.aiConfidence) && (
-                            <p className="text-amber-700 font-medium">Possible mismatch: selected leave type may not match the reason text.</p>
+                            <p className="mt-1 font-medium text-amber-700">Possible mismatch: selected leave type may not match the reason text.</p>
                           )}
                           {leave.aiClassification === "unclassified" && (
-                            <p className="text-muted-foreground">Low-confidence AI suggestion. HR review recommended.</p>
+                            <p className="mt-1">Low-confidence AI suggestion. HR review recommended.</p>
                           )}
+                          <p className="mt-2">Use this explanation as a prompt for review, not an automatic decision.</p>
                         </div>
                       )}
                       {leave.reviewNotes && (
@@ -361,7 +399,7 @@ export default function Leaves() {
             </div>
           )}
         </div>
-      </Card>
+      </OpsSection>
 
       <Dialog open={!!reviewTarget} onOpenChange={(open) => !open && setReviewTarget(null)}>
         <DialogContent>

@@ -1,12 +1,16 @@
 # Product Requirements Document (PRD)
 ## Workforce-AI-Insights → AI-Driven Workforce Operations Platform
 
-> **Implementation Status**: Phase 3 — Sprint A + Sprint B + Sprint C (pagination + anomaly detection) fully implemented & deployed (2026-03-29)
-> - ✅ Sprint A: Dashboard AI summary cards for Worker, Manager, Admin/HR
-> - ✅ Sprint B: Productivity trend charts (recharts) on Dashboard and Productivity page
-> - ✅ Sprint C: Paginated views, skeleton loading, toast notifications, badge variants
-> - ✅ Anomaly Detection Engine: configurable thresholds, severity levels, `/api/anomalies` endpoint
-> - Phase 2 (Workflows) fully deployed
+> **Implementation Status**: Phase 4A — internal release-readiness implementation completed (2026-03-30), not yet deployed
+> - ✅ Phase 2: Workflows fully implemented
+> - ✅ Phase 3: AI summaries, productivity intelligence, pagination, and anomaly detection implemented
+> - ✅ Phase 4A: Go-Live Center scaffold on Dashboard for Admin/HR
+> - ✅ Phase 4A: Users server-driven pagination implemented
+> - ✅ Phase 4A: Alerts, Attendance, and Medical Certificates queue polish implemented
+> - ✅ Phase 4A: KPI taxonomy + lightweight frontend KPI instrumentation implemented
+> - ✅ Phase 4A: CI/API test gate re-enabled and Vitest CI serialization configured
+> - ✅ Phase 4A: additive anomaly payload enrichment implemented
+> - ⏳ Remaining before deployment: DB-backed API test execution, full generated-client/codegen refresh in a provisioned environment, final non-production verification, and launch/deployment signoff
 
 ### Deployment Record (2026-03-29)
 
@@ -61,6 +65,32 @@
 **Phase 3 Sprint B changes:** Recharts productivity trend charts on Dashboard and Productivity page.
 
 **UI/UX fix changes:** SSR-safe sidebar, skeleton loading on Dashboard/Leaves/Attendance, toast notifications for all mutations.
+
+---
+
+**Implementation Record — Phase 4A (Internal Release Readiness) (2026-03-30)**
+
+> This work is implemented in code and internally validated via package typechecks. It has **not** been deployed yet.
+
+**Phase 4A changes completed:**
+- Admin/HR **Go-Live Center** scaffold added to `Dashboard.tsx`
+- derived readiness checklist for departments, employees, face registration, and active workflows
+- Users page moved to **server-driven pagination** (`page`, `pageSize`, `totalPages`)
+- shared KPI taxonomy added in `lib/api-zod/src/kpiTaxonomy.ts`
+- lightweight frontend KPI tracking helper added in `artifacts/hr-app/src/lib/kpiTracking.ts`
+- Dashboard quick actions, Face Registration actions, and Alerts workflow actions instrumented for KPI events
+- Alerts queue polished with stronger empty states, query-param handling, and clearer queue summaries
+- Attendance queue polished with improved empty states, triage cues, and exception-review context
+- Medical Certificates queue polished with queue summary cards, richer empty states, and filter-reset guidance
+- anomaly payloads enriched additively with optional metadata scaffolding for richer UI/analytics support
+- CI re-enabled API test execution in `.github/workflows/ci.yml`
+- Vitest CI execution serialized in `artifacts/api-server/vitest.config.ts` to reduce shared-test-DB flakiness
+
+**Phase 4A verification status:**
+- ✅ `artifacts/hr-app` typecheck passed locally
+- ✅ `artifacts/api-server` typecheck passed locally
+- ⏳ DB-backed API test execution still depends on a running Postgres test environment
+- ⏳ full codegen regeneration still needs a fully provisioned environment if generated artifacts are to be refreshed automatically
 
 ## 1. Product Vision
 
@@ -246,6 +276,13 @@ The current platform works, but it is too basic and admin-heavy for an operation
 ## 5. Feature Requirements
 
 ## A. Guided Onboarding and Go-Live
+
+> **Status**: 🟡 Partially Implemented (2026-03-30)
+> - Go-Live Center scaffold added to Dashboard for Admin/HR
+> - derived readiness checklist implemented for setup-critical areas
+> - face registration rollout is now surfaced operationally via dashboard readiness + existing face registration page
+> - stronger empty-state and activation guidance added in key workflows
+> - full multi-step onboarding wizard and persisted onboarding state are still pending
 
 ### Requirements
 1. **Setup wizard**
@@ -543,10 +580,17 @@ Suggested statuses:
 ## 6. Functional Requirements
 
 ## 6.1 Onboarding Module
+
+> **Status**: 🟡 Partially Implemented (2026-03-30)
+>
 - Admin can complete guided setup steps in sequence
 - System tracks onboarding completion state
 - Empty-state guidance is role-aware
 - Sample/demo data mode is supported in non-production environments
+
+**Current implementation note:**
+- Admin/HR Go-Live readiness is currently implemented as a dashboard scaffold with derived checklist items and workflow CTAs.
+- A full persisted onboarding wizard/checklist engine remains pending.
 
 ## 6.2 Dashboard Module
 - Role-based dashboard content is served per authenticated user role
@@ -905,12 +949,83 @@ Recharts-powered productivity trend charts on Dashboard and Productivity page. U
 **Files:** `DashboardLayout.tsx`, `Dashboard.tsx`, `Leaves.tsx`, `Attendance.tsx`, `Alerts.tsx`
 
 ## Phase 4: Polish / Release
+**Status**: 🟡 In Progress
+
 Focus:
 - UX refinement
 - performance tuning
 - analytics quality tuning
 - alert threshold calibration
 - rollout materials and readiness
+
+### Phase 4A: Internal Release Readiness ✅ (2026-03-30)
+
+Completed scope:
+- Go-Live Center scaffold for Admin/HR
+- dashboard actionability improvements
+- Users server-driven pagination
+- workflow queue polish for Alerts, Attendance, and Medical Certificates
+- KPI taxonomy + lightweight event instrumentation
+- additive anomaly payload enrichment
+- CI/API test re-enablement configuration
+
+### Phase 4A.1: Workforce Operations Brand + UX Redesign ✅ (2026-03-30)
+
+Completed scope:
+- shared frontend visual system refreshed for a more premium **Workforce Operations** brand direction
+- global shell and navigation reframed into a role-aware workforce-operations cockpit
+- login, loading, and not-found experiences updated to match trusted operational/compliance positioning
+- dashboard reframed around **status -> insight -> action** for worker, manager, and HR/Admin views
+- workflow-page redesign applied across Alerts, Attendance, Check In/Out, Medical Certificates, Leaves, Interventions, Productivity, Users, Departments, Man-Hours, and Face Registration
+- biometric and AI-heavy flows updated with stronger trust, explainability, fairness, and review framing while preserving existing backend behavior
+- queue-oriented UX expanded across alerts, attendance exceptions, certificates, interventions, and leave review surfaces
+- reporting/admin pages aligned to the same cockpit language without removing existing export/print/report capabilities
+
+Files materially updated:
+- `artifacts/hr-app/src/index.css`
+- `artifacts/hr-app/src/components/layout/DashboardLayout.tsx`
+- `artifacts/hr-app/src/App.tsx`
+- `artifacts/hr-app/src/components/ui/ops-cockpit.tsx`
+- `artifacts/hr-app/src/pages/Login.tsx`
+- `artifacts/hr-app/src/pages/not-found.tsx`
+- `artifacts/hr-app/src/pages/Dashboard.tsx`
+- `artifacts/hr-app/src/pages/Alerts.tsx`
+- `artifacts/hr-app/src/pages/Attendance.tsx`
+- `artifacts/hr-app/src/pages/CheckIn.tsx`
+- `artifacts/hr-app/src/pages/MedicalCertificates.tsx`
+- `artifacts/hr-app/src/pages/Leaves.tsx`
+- `artifacts/hr-app/src/pages/Interventions.tsx`
+- `artifacts/hr-app/src/pages/Productivity.tsx`
+- `artifacts/hr-app/src/pages/Users.tsx`
+- `artifacts/hr-app/src/pages/Departments.tsx`
+- `artifacts/hr-app/src/pages/ManHours.tsx`
+- `artifacts/hr-app/src/pages/FaceRegistration.tsx`
+
+Verification status:
+- ✅ workspace typecheck passed
+- ✅ workspace build passed
+- ✅ frontend preview server started successfully
+- ⚠️ API integration tests are currently skipped in the existing suite, so they did not provide runtime validation
+- ⚠️ local API runtime smoke test was blocked by missing `DATABASE_URL` at startup (`lib/db/src/index.ts`)
+- ⏳ full end-to-end non-production runtime verification is still required before deployment
+
+Design guardrails preserved during redesign:
+- role-aware experience by worker / manager / HR-admin scope
+- progressive disclosure on dense reporting and workflow screens
+- trust + auditability for biometric and AI-assisted decisions
+- additive UX refactor only; no deployment and no backend contract rewrite performed as part of this redesign pass
+
+### Phase 4B: Final Validation, Launch Prep, and Deployment Readiness
+
+Remaining deliverables:
+- provision a valid database-backed environment for API runtime smoke testing (`DATABASE_URL` required locally)
+- DB-backed API test execution in a provisioned environment
+- final generated-client/codegen refresh in a fully provisioned environment
+- final regression pass for dashboard, queue, and auth-scoped workflows
+- performance validation on representative seeded data
+- alert/anomaly threshold calibration using validated test/staging data
+- rollout materials, launch checklist, and deployment signoff
+- non-production verification pass before production deployment
 
 Deliverables:
 - polished dashboards

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, type UserRole } from "@workspace/db";
-import { eq, and, SQL, inArray } from "drizzle-orm";
+import { eq, and, SQL, inArray, desc } from "drizzle-orm";
 import {
   ListUsersQueryParams,
   ListUsersResponse,
@@ -46,10 +46,13 @@ router.get("/users", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
+  const query = params.data as typeof params.data & { page?: number; pageSize?: number };
 
   const scopedUserIds = await getScopedUserIds(jwtUser);
   if (scopedUserIds !== null && scopedUserIds.length === 0) {
-    res.json(ListUsersResponse.parse({ users: [], total: 0 }));
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 25;
+    res.json(ListUsersResponse.parse({ users: [], total: 0, page, pageSize, totalPages: 0 }));
     return;
   }
 
@@ -67,10 +70,27 @@ router.get("/users", requireAuth, async (req, res): Promise<void> => {
     conditions.push(eq(usersTable.isActive, params.data.isActive ? "true" : "false"));
   }
 
-  const users = await db.select().from(usersTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
+  const page = query.page ?? 1;
+  const pageSize = query.pageSize ?? 25;
 
-  res.json(ListUsersResponse.parse({ users: users.map(mapUser), total: users.length }));
+  const users = await db.select().from(usersTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(usersTable.createdAt))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  const allMatchingUsers = await db.select({ id: usersTable.id }).from(usersTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+  const total = allMatchingUsers.length;
+  const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+  res.json(ListUsersResponse.parse({
+    users: users.map(mapUser),
+    total,
+    page,
+    pageSize,
+    totalPages,
+  }));
 });
 
 router.post("/users", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {

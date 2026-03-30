@@ -128,6 +128,19 @@ paths:
           name: isActive
           schema:
             type: boolean
+        - in: query
+          name: page
+          schema:
+            type: number
+            minimum: 1
+          description: 1-based page index for server-driven pagination.
+        - in: query
+          name: pageSize
+          schema:
+            type: number
+            minimum: 1
+            maximum: 100
+          description: Number of users to return per page.
       responses:
         "200":
           description: List of users
@@ -811,6 +824,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/AlertResponse"
 
+  /alerts/{id}/comments:
+    get:
+      operationId: listAlertComments
+      tags: [alerts]
+      summary: List alert comments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Alert comments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationCommentListResponse"
+    post:
+      operationId: createAlertComment
+      tags: [alerts]
+      summary: Create alert comment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollaborationCommentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationCommentResponse"
+
+  /alerts/{id}/handoffs:
+    get:
+      operationId: listAlertHandoffs
+      tags: [alerts]
+      summary: List alert handoffs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Alert handoffs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnershipHandoffListResponse"
+
   /attendance-exceptions:
     get:
       operationId: listAttendanceExceptions
@@ -897,6 +971,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AttendanceExceptionResponse"
+
+  /attendance-exceptions/{id}/comments:
+    get:
+      operationId: listAttendanceExceptionComments
+      tags: [attendance-exceptions]
+      summary: List attendance exception comments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Attendance exception comments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationCommentListResponse"
+    post:
+      operationId: createAttendanceExceptionComment
+      tags: [attendance-exceptions]
+      summary: Create attendance exception comment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollaborationCommentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollaborationCommentResponse"
+
+  /attendance-exceptions/{id}/handoffs:
+    get:
+      operationId: listAttendanceExceptionHandoffs
+      tags: [attendance-exceptions]
+      summary: List attendance exception handoffs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Attendance exception handoffs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnershipHandoffListResponse"
 
   /face-verification-attempts:
     get:
@@ -1165,6 +1300,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnomalyListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden — admin, hr, or manager role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /operational-control/summary:
+    get:
+      operationId: getOperationalControlSummary
+      tags: [alerts]
+      summary: Get operational control queue summary
+      description: |
+        Returns SLA targets, queue aging, overdue counts, owner/unassigned load,
+        oldest item metrics, and breach-risk summaries for alerts, attendance exceptions,
+        and medical certificate review queues.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: workflow
+          schema:
+            type: string
+            enum: [alerts, attendance_exceptions, medical_certificates]
+          description: Optional workflow filter.
+      responses:
+        "200":
+          description: Operational control summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationalControlSummaryResponse"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
           content:
@@ -1474,9 +1653,18 @@ components:
             $ref: "#/components/schemas/UserResponse"
         total:
           type: number
+        page:
+          type: number
+        pageSize:
+          type: number
+        totalPages:
+          type: number
       required:
         - users
         - total
+        - page
+        - pageSize
+        - totalPages
 
     CreateUserRequest:
       type: object
@@ -2136,6 +2324,111 @@ components:
           type: number
         resolutionNotes:
           type: string
+        handoffNote:
+          type: string
+
+    CollaborationCommentResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        workflowType:
+          type: string
+          enum: [alert, attendance_exception]
+        recordId:
+          type: number
+        authorId:
+          type: number
+        body:
+          type: string
+        mentionedUserIds:
+          type: array
+          items:
+            type: number
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - workflowType
+        - recordId
+        - authorId
+        - body
+        - mentionedUserIds
+        - createdAt
+        - updatedAt
+
+    CollaborationCommentListResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/CollaborationCommentResponse"
+        total:
+          type: number
+      required:
+        - comments
+        - total
+
+    CreateCollaborationCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+        mentionedUserIds:
+          type: array
+          items:
+            type: number
+      required:
+        - body
+
+    OwnershipHandoffResponse:
+      type: object
+      properties:
+        id:
+          type: number
+        workflowType:
+          type: string
+          enum: [alert, attendance_exception]
+        recordId:
+          type: number
+        fromUserId:
+          type: number
+          nullable: true
+        toUserId:
+          type: number
+        handedOffBy:
+          type: number
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - workflowType
+        - recordId
+        - toUserId
+        - handedOffBy
+        - createdAt
+
+    OwnershipHandoffListResponse:
+      type: object
+      properties:
+        handoffs:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnershipHandoffResponse"
+        total:
+          type: number
+      required:
+        - handoffs
+        - total
 
     ProductivityScoreResponse:
       type: object
@@ -2525,6 +2818,221 @@ components:
       required:
         - faceDescriptor
 
+    OperationalControlOldestItem:
+      type: object
+      properties:
+        itemId:
+          type: number
+        ownerId:
+          type: number
+          nullable: true
+        ownerName:
+          type: string
+          nullable: true
+        status:
+          type: string
+        ageHours:
+          type: number
+        resolutionDueAt:
+          type: string
+          format: date-time
+      required:
+        - itemId
+        - status
+        - ageHours
+        - resolutionDueAt
+
+    OperationalControlOwnerLoad:
+      type: object
+      properties:
+        ownerId:
+          type: number
+          nullable: true
+        ownerName:
+          type: string
+        activeCount:
+          type: number
+        overdueCount:
+          type: number
+        oldestItemAgeHours:
+          type: number
+      required:
+        - ownerName
+        - activeCount
+        - overdueCount
+        - oldestItemAgeHours
+
+    OperationalControlBreachRiskSummary:
+      type: object
+      properties:
+        atRiskCount:
+          type: number
+        dueWithin4HoursCount:
+          type: number
+        dueWithin8HoursCount:
+          type: number
+        dueWithin24HoursCount:
+          type: number
+      required:
+        - atRiskCount
+        - dueWithin4HoursCount
+        - dueWithin8HoursCount
+        - dueWithin24HoursCount
+
+    OperationalControlPriorityItem:
+      type: object
+      properties:
+        workflow:
+          type: string
+          enum: [alerts, attendance_exceptions, medical_certificates]
+        itemId:
+          type: number
+        userId:
+          type: number
+          nullable: true
+        ownerId:
+          type: number
+          nullable: true
+        ownerName:
+          type: string
+          nullable: true
+        status:
+          type: string
+        ageHours:
+          type: number
+        responseBreached:
+          type: boolean
+        resolutionBreached:
+          type: boolean
+        resolutionDueAt:
+          type: string
+          format: date-time
+        priorityScore:
+          type: number
+      required:
+        - workflow
+        - itemId
+        - status
+        - ageHours
+        - responseBreached
+        - resolutionBreached
+        - resolutionDueAt
+        - priorityScore
+
+    OperationalControlWorkflowSummary:
+      type: object
+      properties:
+        workflow:
+          type: string
+          enum: [alerts, attendance_exceptions, medical_certificates]
+        queueLabel:
+          type: string
+        sla:
+          type: object
+          properties:
+            responseHours:
+              type: number
+            resolutionHours:
+              type: number
+          required:
+            - responseHours
+            - resolutionHours
+        backlogCount:
+          type: number
+        overdueCount:
+          type: number
+        responseBreachedCount:
+          type: number
+        slaAttainmentRate:
+          type: number
+        averageAgeHours:
+          type: number
+        oldestOpenItem:
+          allOf:
+            - $ref: "#/components/schemas/OperationalControlOldestItem"
+          nullable: true
+        agingBuckets:
+          type: object
+          properties:
+            "0_24h":
+              type: number
+            "24_48h":
+              type: number
+            "48_72h":
+              type: number
+            "72h_plus":
+              type: number
+          required:
+            - "0_24h"
+            - "24_48h"
+            - "48_72h"
+            - "72h_plus"
+        ownerLoad:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationalControlOwnerLoad"
+        breachRiskSummary:
+          $ref: "#/components/schemas/OperationalControlBreachRiskSummary"
+        topPriorityItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationalControlPriorityItem"
+      required:
+        - workflow
+        - queueLabel
+        - sla
+        - backlogCount
+        - overdueCount
+        - responseBreachedCount
+        - slaAttainmentRate
+        - averageAgeHours
+        - oldestOpenItem
+        - agingBuckets
+        - ownerLoad
+        - breachRiskSummary
+        - topPriorityItems
+
+    OperationalControlSummaryResponse:
+      type: object
+      properties:
+        asOf:
+          type: string
+          format: date-time
+        workflowFilter:
+          type: string
+          enum: [alerts, attendance_exceptions, medical_certificates]
+          nullable: true
+        workflows:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationalControlWorkflowSummary"
+        totals:
+          type: object
+          properties:
+            backlogCount:
+              type: number
+            overdueCount:
+              type: number
+            responseBreachedCount:
+              type: number
+            breachRiskSummary:
+              $ref: "#/components/schemas/OperationalControlBreachRiskSummary"
+          required:
+            - backlogCount
+            - overdueCount
+            - responseBreachedCount
+            - breachRiskSummary
+        priorityQueue:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationalControlPriorityItem"
+      required:
+        - asOf
+        - workflowFilter
+        - workflows
+        - totals
+        - priorityQueue
+
     # Attendance Exception Workflow Schemas
     AttendanceExceptionResponse:
       type: object
@@ -2544,6 +3052,16 @@ components:
           enum: [open, under_review, approved, rejected, escalated]
         requestedBy:
           type: number
+        assignedTo:
+          type: number
+          nullable: true
+        assignedBy:
+          type: number
+          nullable: true
+        assignedAt:
+          type: string
+          format: date-time
+          nullable: true
         reviewedBy:
           type: number
           nullable: true
@@ -2611,6 +3129,10 @@ components:
           type: string
           enum: [under_review, approved, rejected, escalated]
         reviewNotes:
+          type: string
+        assignedTo:
+          type: number
+        handoffNote:
           type: string
 
     # Face Verification Attempt Schemas
@@ -2719,6 +3241,26 @@ components:
         message:
           type: string
 
+    AnomalyEvidence:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        numericValue:
+          type: number
+          nullable: true
+        threshold:
+          type: string
+          nullable: true
+      required:
+        - key
+        - label
+        - value
+
     Anomaly:
       type: object
       properties:
@@ -2745,6 +3287,19 @@ components:
         detectedAt:
           type: string
           format: date-time
+        ruleKey:
+          type: string
+          nullable: true
+        recommendations:
+          type: array
+          nullable: true
+          items:
+            type: string
+        evidence:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/AnomalyEvidence"
       required:
         - id
         - type

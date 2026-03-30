@@ -4,8 +4,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useGetAttendanceSummary, type AttendanceSummaryResponse } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/core";
+import { OpsHero, OpsPageHeader, OpsQueueNotice, OpsSection, OpsStatCard, OpsStatGrid } from "@/components/ui/ops-cockpit";
 import { useAuth } from "@/lib/auth";
-import { FileDown, DollarSign, Clock } from "lucide-react";
+import { FileDown, DollarSign, Clock, ReceiptText } from "lucide-react";
 
 function exportToCsv(data: AttendanceSummaryResponse, startDate: string, endDate: string) {
   const headers = ["Employee", "User ID", "Days Worked", "Total Hours", "Hourly Rate (SGD)", "Total Cost (SGD)"];
@@ -60,47 +61,47 @@ export default function ManHours() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Man-Hours & Cost</h1>
-          <p className="text-muted-foreground">Financial summary for the employees in your visible scope.</p>
-        </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-auto" />
-          <span className="self-center font-medium text-muted-foreground">to</span>
-          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-auto" />
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-secondary text-primary font-semibold rounded-xl hover:bg-secondary/80 transition-colors disabled:opacity-50"
-            onClick={handleExport}
-            disabled={!summaryData?.items?.length}
-          >
-            <FileDown className="w-4 h-4" /> Export CSV
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card className="bg-primary text-white border-0 shadow-xl shadow-primary/20">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-primary-foreground/80 font-medium mb-1">Total Man-Hours</p>
-              <h2 className="text-4xl font-display font-bold">{summaryData?.totalManHours || "0"} <span className="text-xl font-normal opacity-80">hrs</span></h2>
-            </div>
-            <Clock className="w-12 h-12 opacity-50" />
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title="Man-Hours & Cost"
+        description="Translate attendance into labor exposure for the visible workforce while preserving the current CSV export flow used for finance and operational review."
+        actions={
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-auto" />
+            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-auto" />
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-secondary text-primary font-semibold rounded-xl hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              onClick={handleExport}
+              disabled={!summaryData?.items?.length}
+            >
+              <FileDown className="w-4 h-4" /> Export CSV
+            </button>
           </div>
-        </Card>
-        <Card className="bg-emerald-900 text-white border-0 shadow-xl shadow-emerald-900/20">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <p className="text-emerald-100/80 font-medium mb-1">Total Estimated Cost</p>
-              <h2 className="text-4xl font-display font-bold"><span className="text-xl font-normal opacity-80">SGD $</span>{summaryData?.totalCost || "0.00"}</h2>
-            </div>
-            <DollarSign className="w-12 h-12 opacity-50" />
-          </div>
-        </Card>
-      </div>
+        }
+      />
 
-      <Card>
+      <OpsHero
+        badge="Cost and workforce coverage"
+        icon={ReceiptText}
+        title="Use this as the labor-cost control room for the selected period."
+        description="The figures below preserve the existing reporting contract while making the primary decisions clearer: validate the date range, review total exposure, and export the underlying rows for downstream analysis."
+      >
+        <OpsQueueNotice
+          title="Export behavior preserved"
+          description="CSV generation is unchanged so finance and print/export workflows continue to work as before."
+          tone="success"
+        />
+      </OpsHero>
+
+      <OpsStatGrid>
+        <OpsStatCard label="Total man-hours" value={`${summaryData?.totalManHours || "0"} hrs`} hint="Tracked hours in the selected period." icon={Clock} tone="success" />
+        <OpsStatCard label="Estimated cost" value={`SGD $${summaryData?.totalCost || "0.00"}`} hint="Calculated from visible employee hourly rates." icon={DollarSign} tone="attention" />
+      </OpsStatGrid>
+
+      <OpsSection
+        title="Detailed labor ledger"
+        description="Review employee-by-employee hours and cost before exporting or sharing the report."
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs">
@@ -127,12 +128,19 @@ export default function ManHours() {
                 </tr>
               ))}
               {!isLoading && !summaryData?.items?.length && (
-                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No data for selected period.</td></tr>
+                <tr>
+                  <td colSpan={5} className="p-8 text-center">
+                    <OpsQueueNotice
+                      title="No labor data for this period"
+                      description="Adjust the date range or wait for attendance records to populate before exporting the report."
+                    />
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </Card>
+      </OpsSection>
     </DashboardLayout>
   );
 }

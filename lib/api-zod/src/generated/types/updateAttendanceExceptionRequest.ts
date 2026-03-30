@@ -10,4 +10,6 @@ import type { UpdateAttendanceExceptionRequestStatus } from "./updateAttendanceE
 export interface UpdateAttendanceExceptionRequest {
   status?: UpdateAttendanceExceptionRequestStatus;
   reviewNotes?: string;
+  assignedTo?: number;
+  handoffNote?: string;
 }

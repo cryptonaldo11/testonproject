@@ -10,4 +10,7 @@ import type { UserResponse } from "./userResponse";
 export interface UserListResponse {
   users: UserResponse[];
   total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }

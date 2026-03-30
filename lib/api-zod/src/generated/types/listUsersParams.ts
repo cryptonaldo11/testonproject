@@ -10,4 +10,15 @@ export type ListUsersParams = {
   role?: string;
   departmentId?: number;
   isActive?: boolean;
+  /**
+   * 1-based page index for server-driven pagination.
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * Number of users to return per page.
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
 };

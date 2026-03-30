@@ -20,7 +20,8 @@ export type AppPermission =
   | "alerts:assign"
   | "exceptions:review"
   | "productivity:manage"
-  | "face:manage";
+  | "face:manage"
+  | "interventions:manage";
 
 type AppRole = "admin" | "hr" | "manager" | "worker" | "driver";
 
@@ -37,6 +38,7 @@ const ALL_PERMISSIONS: readonly AppPermission[] = [
   "exceptions:review",
   "productivity:manage",
   "face:manage",
+  "interventions:manage",
 ];
 
 const ROLE_PERMISSIONS: Record<AppRole, readonly AppPermission[]> = {
@@ -51,6 +53,7 @@ const ROLE_PERMISSIONS: Record<AppRole, readonly AppPermission[]> = {
     "exceptions:review",
     "productivity:manage",
     "face:manage",
+    "interventions:manage",
   ],
   manager: [
     "operational:read:team",
@@ -58,6 +61,7 @@ const ROLE_PERMISSIONS: Record<AppRole, readonly AppPermission[]> = {
     "users:read",
     "alerts:assign",
     "exceptions:review",
+    "interventions:manage",
   ],
   worker: [],
   driver: [],

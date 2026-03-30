@@ -4,6 +4,7 @@
 // Solution: re-export from api.ts first (source of truth for schemas), then
 // re-export from types/ only the names NOT already in api.ts.
 export * from "./generated/api";
+export * from "./kpiTaxonomy";
 
 import * as apiExports from "./generated/api";
 import * as typeExports from "./generated/types";

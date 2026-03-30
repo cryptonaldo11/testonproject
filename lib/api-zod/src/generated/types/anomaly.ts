@@ -5,6 +5,7 @@
  * Teston HR Management System API
  * OpenAPI spec version: 0.1.0
  */
+import type { AnomalyEvidence } from "./anomalyEvidence";
 import type { AnomalySeverity } from "./anomalySeverity";
 import type { AnomalyType } from "./anomalyType";
 
@@ -20,4 +21,7 @@ export interface Anomaly {
   /** Detailed explanation of the anomaly */
   detail: string;
   detectedAt: Date;
+  ruleKey?: string | null;
+  recommendations?: string[] | null;
+  evidence?: AnomalyEvidence[] | null;
 }

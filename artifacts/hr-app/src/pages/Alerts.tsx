@@ -1,10 +1,12 @@
 import { useToast } from "@/hooks/use-toast";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { trackKpiEvent } from "@/lib/kpiTracking";
 import { useListAlerts, useUpdateAlert, useListUsers } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/core";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { formatDate } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -12,11 +14,23 @@ import {
   ShieldAlert,
   CheckCircle2,
   Filter,
+  SearchX,
   UserCheck,
   UserX,
   MessageSquare,
+  Siren,
+  Workflow,
+  ShieldCheck,
 } from "lucide-react";
 import { ADMIN_HR_ROLES, OPERATIONAL_ROLES, useAuth } from "@/lib/auth";
+import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+  OpsStatCard,
+  OpsStatGrid,
+} from "@/components/ui/ops-cockpit";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +63,7 @@ export default function Alerts() {
   const [assignToUserId, setAssignToUserId] = useState<string>("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
+  const alertStatuses = ["new", "acknowledged", "in_progress", "resolved", "dismissed"] as const;
 
   const alertsQuery = isOperational
     ? statusFilter !== "all"
@@ -64,6 +79,11 @@ export default function Alerts() {
     },
   });
 
+  const rawSearch = typeof window === "undefined" ? "" : window.location.search;
+  const queryParams = useMemo(() => new URLSearchParams(rawSearch), [rawSearch]);
+  const requestedAlertId = queryParams.get("alertId");
+  const requestedStatus = queryParams.get("status");
+
   const userMap = useMemo(() => {
     const map = new Map<number, string>();
     usersData?.users?.forEach((u) => map.set(u.id, u.name || `User #${u.id}`));
@@ -73,11 +93,58 @@ export default function Alerts() {
     return map;
   }, [user, usersData?.users]);
 
+  useEffect(() => {
+    if (requestedStatus && alertStatuses.includes(requestedStatus as (typeof alertStatuses)[number])) {
+      setStatusFilter(requestedStatus);
+    }
+  }, [requestedStatus]);
+
+  useEffect(() => {
+    if (!requestedAlertId || selectedAlert) return;
+    const alertId = Number(requestedAlertId);
+    if (!Number.isFinite(alertId)) return;
+
+    const target = (alertsData?.alerts ?? []).find((alert) => alert.id === alertId);
+    if (target && (canAssign || canResolve)) {
+      openActionDialog(target);
+    }
+  }, [requestedAlertId, alertsData?.alerts, canAssign, canResolve, selectedAlert]);
+
+  const alertCounts = useMemo(() => {
+    return (alertsData?.alerts ?? []).reduce(
+      (counts, alert) => {
+        counts.total += 1;
+        if (alert.status in counts) {
+          counts[alert.status as "new" | "acknowledged" | "in_progress" | "resolved" | "dismissed"] += 1;
+        }
+        if (!alert.assignedTo && alert.status !== "resolved" && alert.status !== "dismissed") {
+          counts.unassigned += 1;
+        }
+        if (alert.severity === "critical" && alert.status !== "resolved" && alert.status !== "dismissed") {
+          counts.criticalOpen += 1;
+        }
+        return counts;
+      },
+      {
+        total: 0,
+        new: 0,
+        acknowledged: 0,
+        in_progress: 0,
+        resolved: 0,
+        dismissed: 0,
+        unassigned: 0,
+        criticalOpen: 0,
+      },
+    );
+  }, [alertsData?.alerts]);
+
   const paginatedAlerts = useMemo(() => {
     const all = alertsData?.alerts ?? [];
     return all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   }, [alertsData?.alerts, page]);
   const totalAlerts = alertsData?.total ?? alertsData?.alerts?.length ?? 0;
+  const hasActiveFilters = statusFilter !== "all";
+  const totalPages = Math.max(1, Math.ceil(totalAlerts / PAGE_SIZE));
 
   const updateAlertMutation = useUpdateAlert({
     mutation: {
@@ -95,22 +162,27 @@ export default function Alerts() {
   });
 
   const resolveAlert = (id: number, notes?: string) => {
+    trackKpiEvent({ name: "alert_resolved", properties: { alertId: id, role: isAdminHR ? "admin_hr" : isOperational ? "operational" : "self_service" } });
     updateAlertMutation.mutate({ id, data: { status: "resolved", resolutionNotes: notes } });
   };
 
   const dismissAlert = (id: number) => {
+    trackKpiEvent({ name: "alert_dismissed", properties: { alertId: id, role: isAdminHR ? "admin_hr" : isOperational ? "operational" : "self_service" } });
     updateAlertMutation.mutate({ id, data: { status: "dismissed" } });
   };
 
   const acknowledgeAlert = (id: number) => {
+    trackKpiEvent({ name: "alert_acknowledged", properties: { alertId: id, role: isAdminHR ? "admin_hr" : isOperational ? "operational" : "self_service" } });
     updateAlertMutation.mutate({ id, data: { status: "acknowledged" } });
   };
 
   const assignAlert = (id: number, assignedTo: number) => {
+    trackKpiEvent({ name: "alert_assigned", properties: { alertId: id, assignedTo, role: isAdminHR ? "admin_hr" : isOperational ? "operational" : "self_service" } });
     updateAlertMutation.mutate({ id, data: { assignedTo } });
   };
 
   const openActionDialog = (alert: any) => {
+    trackKpiEvent({ name: "alert_manage_opened", properties: { alertId: alert.id, status: alert.status, severity: alert.severity } });
     setSelectedAlert(alert);
     setResolutionNotes(alert.resolutionNotes || "");
     setAssignToUserId(alert.assignedTo ? String(alert.assignedTo) : "");
@@ -147,49 +219,103 @@ export default function Alerts() {
     return userMap.get(userId) || `User #${userId}`;
   };
 
+  const queueTitle = isOperational ? "Alert command queue" : "My alerts and follow-ups";
+  const queueDescription = isOperational
+    ? "Triage signal-driven alerts in the order that protects operations: critical first, unassigned next, then items already in motion."
+    : "Track the alerts that affect your work and review the latest notes, ownership, and workflow status.";
+
   return (
     <DashboardLayout>
-      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">System Alerts</h1>
-          <p className="text-muted-foreground">
-            Notifications for policy violations and system events in your visible scope.
-          </p>
-        </div>
-        {isOperational && (
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                <SelectItem value="in_progress">In progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="dismissed">Dismissed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title="Alerts"
+        description="Review operational signals with clear ownership, explainable status changes, and fast escalation paths without changing the underlying alert workflow."
+        actions={
+          isOperational ? (
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Select value={statusFilter} onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setPage(1);
+                  trackKpiEvent({ name: "alerts_filter_changed", properties: { status: value, role: isAdminHR ? "admin_hr" : isOperational ? "operational" : "self_service" } });
+                }}>
+                <SelectTrigger className="w-[190px]">
+                  <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="acknowledged">Acknowledged</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
+                  <SelectItem value="dismissed">Dismissed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null
+        }
+      />
 
-      <div className="space-y-4">
-        {totalAlerts === 0 && (
-          <Card className="p-12 text-center text-muted-foreground bg-transparent border-dashed">
-            <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-400 mb-4 opacity-50" />
-            All clear! No alerts found.
-          </Card>
-        )}
+      <OpsHero
+        badge={isOperational ? "Live operational queue" : "Personal visibility"}
+        icon={Siren}
+        tone={alertCounts.criticalOpen > 0 ? "critical" : alertCounts.unassigned > 0 ? "attention" : "default"}
+        title={isOperational ? "Work the highest-risk signals before they become incidents." : "See what needs your awareness without losing audit context."}
+        description={isOperational
+          ? "This queue keeps the existing alert contracts intact while making triage simpler: severity, ownership, and workflow state are surfaced first so operators can decide quickly and explain decisions later."
+          : "Your visible alerts stay scoped to you, but the page now frames each item around status, message context, and the next likely action so nothing important is buried."}
+      >
+        <OpsQueueNotice
+          tone={alertCounts.criticalOpen > 0 ? "critical" : "default"}
+          title={alertCounts.criticalOpen > 0 ? `${alertCounts.criticalOpen} critical alert${alertCounts.criticalOpen === 1 ? "" : "s"} need attention` : "Queue guidance"}
+          description={alertCounts.criticalOpen > 0
+            ? "Prioritize unresolved critical signals first, then assign any unowned items so downstream accountability is clear."
+            : isOperational
+              ? "Acknowledge to confirm awareness, assign to establish ownership, and resolve only after notes explain the outcome."
+              : "Read the latest notes and status before escalating through your manager or HR."}
+        />
+      </OpsHero>
 
-        {paginatedAlerts.map((alert) => (
+      {isOperational && alertCounts.total > 0 && (
+        <OpsStatGrid>
+          <OpsStatCard label="New" value={alertCounts.new} hint="Fresh signals waiting for first triage." icon={Siren} tone={alertCounts.new > 0 ? "attention" : "default"} />
+          <OpsStatCard label="Needs owner" value={alertCounts.unassigned} hint="Open alerts without explicit operational ownership." icon={UserCheck} tone={alertCounts.unassigned > 0 ? "attention" : "success"} />
+          <OpsStatCard label="Critical open" value={alertCounts.criticalOpen} hint="Highest-severity alerts still unresolved." icon={ShieldAlert} tone={alertCounts.criticalOpen > 0 ? "critical" : "success"} />
+          <OpsStatCard label="In progress" value={alertCounts.in_progress} hint="Alerts already moving through an active workflow." icon={Workflow} tone="success" />
+        </OpsStatGrid>
+      )}
+
+      <OpsSection
+        title={queueTitle}
+        description={queueDescription}
+      >
+        <div className="space-y-4">
+        {totalAlerts === 0 ? (
+          hasActiveFilters ? (
+            <Empty className="py-16">
+              <EmptyMedia variant="icon"><SearchX className="w-10 h-10" /></EmptyMedia>
+              <EmptyHeader><EmptyTitle>No alerts match this filter</EmptyTitle></EmptyHeader>
+              <EmptyContent>
+                <EmptyDescription>Try a different status or clear the filter to see all alerts.</EmptyDescription>
+                <Button variant="outline" size="sm" onClick={() => setStatusFilter("all")} className="mt-4">Clear filter</Button>
+              </EmptyContent>
+            </Empty>
+          ) : (
+            <Empty className="py-16">
+              <EmptyMedia variant="icon"><CheckCircle2 className="w-10 h-10" /></EmptyMedia>
+              <EmptyHeader><EmptyTitle>All clear</EmptyTitle></EmptyHeader>
+              <EmptyContent>
+                <EmptyDescription>No active alert signals are visible in this scope right now.</EmptyDescription>
+              </EmptyContent>
+            </Empty>
+          )
+        ) : (
+        paginatedAlerts.map((alert) => (
           <Card
             key={alert.id}
-            className={`border-l-4 ${
+            className={`border-l-4 shadow-sm ${
               alert.status === "resolved" || alert.status === "dismissed"
-                ? "border-l-muted opacity-70"
+                ? "border-l-muted opacity-75"
                 : alert.severity === "critical"
                   ? "border-l-destructive"
                   : alert.severity === "warning"
@@ -201,17 +327,52 @@ export default function Alerts() {
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <div className="mt-1">{getIcon(alert.severity)}</div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <h4 className="font-bold text-lg">{alert.title}</h4>
-                      <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
-                        {alert.alertType.replace(/_/g, " ")}
-                      </Badge>
-                      {getStatusBadge(alert.status)}
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h4 className="font-bold text-lg">{alert.title}</h4>
+                        <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                          {alert.alertType.replace(/_/g, " ")}
+                        </Badge>
+                        {getStatusBadge(alert.status)}
+                        {!alert.assignedTo && alert.status !== "resolved" && alert.status !== "dismissed" && (
+                          <Badge variant="warning" className="text-[10px]">Needs owner</Badge>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-sm">{alert.message}</p>
                     </div>
-                    <p className="text-muted-foreground text-sm">{alert.message}</p>
-                    <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-muted-foreground">
-                      <span className="font-mono">{formatDate(alert.createdAt)}</span>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border bg-secondary/20 px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Severity</p>
+                        <p className="mt-1 text-sm font-medium capitalize">{alert.severity}</p>
+                      </div>
+                      <div className="rounded-xl border bg-secondary/20 px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Observed</p>
+                        <p className="mt-1 text-sm font-medium">{formatDate(alert.createdAt)}</p>
+                      </div>
+                      <div className="rounded-xl border bg-secondary/20 px-3 py-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Ownership</p>
+                        <p className="mt-1 text-sm font-medium">{alert.assignedTo ? getEmployeeName(alert.assignedTo) : "Unassigned"}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border bg-background/70 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Why this is in queue</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {alert.status === "new"
+                          ? "This signal is newly created and still needs first acknowledgement or assignment."
+                          : alert.status === "acknowledged"
+                            ? "The alert has been seen, but ownership or resolution still needs to be completed."
+                            : alert.status === "in_progress"
+                              ? "Work is underway. Keep notes current so the next reviewer understands the current state."
+                              : alert.status === "resolved"
+                                ? "The signal is closed, with notes preserved for auditability and later review."
+                                : "The signal was dismissed and remains visible as part of workflow history."}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                       {alert.assignedTo && (
                         <span className="inline-flex items-center gap-1">
                           <UserCheck className="w-3 h-3" />
@@ -221,12 +382,19 @@ export default function Alerts() {
                       {alert.dismissedBy && (
                         <span className="inline-flex items-center gap-1">
                           <UserX className="w-3 h-3" />
-                          Dismissed
+                          Dismissed from active queue
+                        </span>
+                      )}
+                      {alert.status === "resolved" && (
+                        <span className="inline-flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          Resolution preserved in workflow history
                         </span>
                       )}
                     </div>
+
                     {alert.resolutionNotes && (
-                      <div className="mt-3 rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground inline-flex items-start gap-2">
+                      <div className="rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground inline-flex items-start gap-2">
                         <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" />
                         <span>{alert.resolutionNotes}</span>
                       </div>
@@ -234,7 +402,7 @@ export default function Alerts() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 md:justify-end">
+                <div className="flex flex-wrap gap-2 md:justify-end md:max-w-[220px]">
                   {alert.status === "new" && isOperational && (
                     <Button variant="outline" size="sm" onClick={() => acknowledgeAlert(alert.id)}>
                       Acknowledge
@@ -254,7 +422,8 @@ export default function Alerts() {
               </div>
             </div>
           </Card>
-        ))}
+        ))
+        )}
         {totalAlerts > PAGE_SIZE && (
           <div className="flex items-center justify-between px-4 py-3 border rounded-xl bg-card">
             <p className="text-sm text-muted-foreground">
@@ -267,6 +436,7 @@ export default function Alerts() {
           </div>
         )}
       </div>
+      </OpsSection>
 
       <Dialog open={!!selectedAlert} onOpenChange={(open) => !open && setSelectedAlert(null)}>
         <DialogContent>

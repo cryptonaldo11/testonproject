@@ -4,7 +4,15 @@ import { useAuth } from "@/lib/auth";
 import { useCheckIn, useCheckOut, useListAttendance, useGetMyFaceDescriptor } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, CheckCircle2, Camera, CameraOff, AlertCircle, ShieldAlert, ClipboardList } from "lucide-react";
+import { Clock, MapPin, CheckCircle2, Camera, CameraOff, AlertCircle, ShieldAlert, ClipboardList, ScanFace, ShieldCheck } from "lucide-react";
+import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+  OpsStatCard,
+  OpsStatGrid,
+} from "@/components/ui/ops-cockpit";
 import { formatDateTime } from "@/lib/utils";
 import {
   Dialog,
@@ -23,6 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, "") ?? "";
+const apiPath = (path: string) => `${apiBaseUrl}${path}`;
 
 type AttendanceExceptionType =
   | "missed_checkout"
@@ -271,7 +282,7 @@ export default function CheckIn() {
     if (!user?.id) return;
 
     try {
-      await fetch("/api/face-verification-attempts", {
+      await fetch(apiPath("/api/face-verification-attempts"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -295,7 +306,7 @@ export default function CheckIn() {
 
     setAttemptsLoading(true);
     try {
-      const response = await fetch(`/api/face-verification-attempts/user/${user.id}`);
+      const response = await fetch(apiPath(`/api/face-verification-attempts/user/${user.id}`));
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload?.error || "Failed to load verification history.");
@@ -446,7 +457,7 @@ export default function CheckIn() {
 
     setIsSubmittingFallback(true);
     try {
-      const exceptionResponse = await fetch("/api/attendance-exceptions", {
+      const exceptionResponse = await fetch(apiPath("/api/attendance-exceptions"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -539,9 +550,43 @@ export default function CheckIn() {
         ? "mismatch"
         : null;
 
+  const fallbackAttemptCount = faceAttempts.filter((attempt) => attempt.outcome === "fallback_used").length;
+  const failedAttemptCount = faceAttempts.filter((attempt) => attempt.outcome === "failure").length;
+
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto mt-8 space-y-6">
+      <div className="max-w-5xl mx-auto mt-8 space-y-6">
+        <OpsPageHeader
+          eyebrow="Workforce operations cockpit"
+          title="Check in / out"
+          description="Record attendance with biometric verification when available, while preserving manual fallback fairness, visibility into matching status, and recent audit activity."
+        />
+
+        <OpsHero
+          badge={faceVerificationRequired ? "Biometric verification active" : "Fallback-ready attendance"}
+          icon={ScanFace}
+          tone={faceVerificationRequired && !faceVerificationPassed ? "attention" : isCheckedOut ? "success" : "default"}
+          title={faceVerificationRequired ? "Verify identity clearly before recording attendance." : "Attendance can continue even when a face descriptor is not required."}
+          description={faceVerificationRequired
+            ? "The biometric flow is unchanged, but the page now makes matching status, next actions, and fallback fairness easier to understand before you submit a record."
+            : "When no registered face descriptor is present, attendance still follows the current workflow and audit logging continues as before."}
+        >
+          <OpsQueueNotice
+            tone={faceVerificationRequired && !faceVerificationPassed ? "attention" : "default"}
+            title={faceVerificationRequired && !faceVerificationPassed ? "Fallback review remains available" : "Trust and explainability"}
+            description={faceVerificationRequired && !faceVerificationPassed
+              ? "If the camera is unavailable or a match cannot be completed, submit a fallback request so a manager or HR reviewer can assess the case manually."
+              : "Recent attempts, match outcomes, and fallback submissions remain visible so attendance decisions are explainable later."}
+          />
+        </OpsHero>
+
+        <OpsStatGrid>
+          <OpsStatCard label="Checked in" value={isCheckedIn ? "Yes" : "No"} hint={isCheckedIn ? "Your start time is already on record today." : "No start time has been recorded yet today."} icon={Clock} tone={isCheckedIn ? "success" : "default"} />
+          <OpsStatCard label="Checked out" value={isCheckedOut ? "Yes" : "No"} hint={isCheckedOut ? "Your day is fully recorded." : "A checkout is still pending today."} icon={ShieldCheck} tone={isCheckedOut ? "success" : "attention"} />
+          <OpsStatCard label="Failed attempts" value={failedAttemptCount} hint="Recent verification attempts that did not complete." icon={AlertCircle} tone={failedAttemptCount > 0 ? "attention" : "success"} />
+          <OpsStatCard label="Fallback used" value={fallbackAttemptCount} hint="Recent manual-review submissions tied to verification issues." icon={ShieldAlert} tone={fallbackAttemptCount > 0 ? "attention" : "default"} />
+        </OpsStatGrid>
+
         <Card className="overflow-hidden border-0 shadow-2xl">
           <div className="bg-primary p-8 text-center text-white relative">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
@@ -658,84 +703,86 @@ export default function CheckIn() {
                   Check Out
                 </Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              <div className="w-full bg-secondary/30 rounded-2xl p-6 border border-border/50">
-                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary" />
-                  Today&apos;s Status
-                </h3>
+        <OpsSection
+          title="Today’s attendance status"
+          description="Review what has already been recorded today, including any available match score context."
+        >
+          <div className="w-full bg-secondary/30 rounded-2xl p-6 border border-border/50">
+            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Today&apos;s Status
+            </h3>
 
-                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-white bg-primary text-white shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
-                      <CheckCircle2 className="w-3 h-3" />
-                    </div>
-                    <div className="w-[calc(100%-3rem)] md:w-[calc(50%-1.5rem)] bg-card p-3 rounded-xl border shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm">Check In</span>
-                        <span className="text-xs text-muted-foreground font-mono">{isCheckedIn ? formatDateTime(todayLog?.checkIn) : "--:--"}</span>
-                      </div>
-                      {todayLog?.faceMatchScore && (
-                        <p className="text-xs text-muted-foreground mt-1">Match score: {parseFloat(todayLog.faceMatchScore).toFixed(2)}</p>
-                      )}
-                    </div>
+            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
+              <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                <div className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-white bg-primary text-white shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
+                  <CheckCircle2 className="w-3 h-3" />
+                </div>
+                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-1.5rem)] bg-card p-3 rounded-xl border shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-sm">Check In</span>
+                    <span className="text-xs text-muted-foreground font-mono">{isCheckedIn ? formatDateTime(todayLog?.checkIn) : "--:--"}</span>
                   </div>
+                  {todayLog?.faceMatchScore && (
+                    <p className="text-xs text-muted-foreground mt-1">Match score: {parseFloat(todayLog.faceMatchScore).toFixed(2)}</p>
+                  )}
+                </div>
+              </div>
 
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-                    <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 border-white shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 ${isCheckedOut ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
-                      <CheckCircle2 className="w-3 h-3" />
-                    </div>
-                    <div className="w-[calc(100%-3rem)] md:w-[calc(50%-1.5rem)] bg-card p-3 rounded-xl border shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm">Check Out</span>
-                        <span className="text-xs text-muted-foreground font-mono">{isCheckedOut ? formatDateTime(todayLog?.checkOut) : "--:--"}</span>
-                      </div>
-                    </div>
+              <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 border-white shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 ${isCheckedOut ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                  <CheckCircle2 className="w-3 h-3" />
+                </div>
+                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-1.5rem)] bg-card p-3 rounded-xl border shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-sm">Check Out</span>
+                    <span className="text-xs text-muted-foreground font-mono">{isCheckedOut ? formatDateTime(todayLog?.checkOut) : "--:--"}</span>
                   </div>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </OpsSection>
 
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-primary" />
-              <h3 className="font-display text-xl font-bold">Recent face verification activity</h3>
+        <OpsSection
+          title="Recent face verification activity"
+          description="Keep recent verification attempts visible so fallback use and biometric issues remain explainable."
+        >
+          {attemptsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading verification history...</p>
+          ) : faceAttempts.length === 0 ? (
+            <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+              No verification attempts recorded yet.
             </div>
-            {attemptsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading verification history...</p>
-            ) : faceAttempts.length === 0 ? (
-              <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                No verification attempts recorded yet.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {faceAttempts.map((attempt) => (
-                  <div key={attempt.id} className="rounded-xl border bg-secondary/20 p-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold capitalize">{attempt.attemptType.replace(/_/g, " ")} · {attempt.outcome.replace(/_/g, " ")}</p>
-                        <p className="text-xs text-muted-foreground">{formatDateTime(attempt.createdAt)}</p>
-                      </div>
-                      {attempt.failureReason && (
-                        <p className="text-sm text-muted-foreground">{getFailureReasonLabel(attempt.failureReason)}</p>
-                      )}
+          ) : (
+            <div className="space-y-3">
+              {faceAttempts.map((attempt) => (
+                <div key={attempt.id} className="rounded-xl border bg-secondary/20 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold capitalize">{attempt.attemptType.replace(/_/g, " ")} · {attempt.outcome.replace(/_/g, " ")}</p>
+                      <p className="text-xs text-muted-foreground">{formatDateTime(attempt.createdAt)}</p>
                     </div>
-                    {(attempt.notes || attempt.fallbackMethod) && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {attempt.fallbackMethod ? `Fallback: ${attempt.fallbackMethod}` : ""}
-                        {attempt.fallbackMethod && attempt.notes ? " · " : ""}
-                        {attempt.notes || ""}
-                      </p>
+                    {attempt.failureReason && (
+                      <p className="text-sm text-muted-foreground">{getFailureReasonLabel(attempt.failureReason)}</p>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  {(attempt.notes || attempt.fallbackMethod) && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {attempt.fallbackMethod ? `Fallback: ${attempt.fallbackMethod}` : ""}
+                      {attempt.fallbackMethod && attempt.notes ? " · " : ""}
+                      {attempt.notes || ""}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </OpsSection>
       </div>
 
       <Dialog open={isFallbackDialogOpen} onOpenChange={setIsFallbackDialogOpen}>

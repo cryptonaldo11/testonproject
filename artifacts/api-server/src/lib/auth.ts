@@ -27,7 +27,8 @@ export type AppPermission =
   | "alerts:assign"
   | "exceptions:review"
   | "productivity:manage"
-  | "face:manage";
+  | "face:manage"
+  | "interventions:manage";
 
 const ALL_PERMISSIONS: readonly AppPermission[] = [
   "operational:read:all",
@@ -42,6 +43,7 @@ const ALL_PERMISSIONS: readonly AppPermission[] = [
   "exceptions:review",
   "productivity:manage",
   "face:manage",
+  "interventions:manage",
 ];
 
 export const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
@@ -56,6 +58,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "exceptions:review",
     "productivity:manage",
     "face:manage",
+    "interventions:manage",
   ],
   manager: [
     "operational:read:team",
@@ -63,6 +66,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly AppPermission[]> = {
     "users:read",
     "alerts:assign",
     "exceptions:review",
+    "interventions:manage",
   ],
   worker: [],
   driver: [],
@@ -169,6 +173,10 @@ export function canReviewExceptions(role: UserRole): boolean {
 
 export function canManageProductivity(role: UserRole): boolean {
   return hasPermission(role, "productivity:manage");
+}
+
+export function canManageInterventions(role: UserRole): boolean {
+  return hasPermission(role, "interventions:manage");
 }
 
 export async function getUserDepartmentId(userId: number): Promise<number | null> {

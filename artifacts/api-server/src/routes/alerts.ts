@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db, alertsTable, type AlertType, type AlertSeverity, type AlertStatus } from "@workspace/db";
 import { eq, and, SQL, inArray, isNull, or } from "drizzle-orm";
 import {
@@ -10,6 +10,16 @@ import {
   UpdateAlertResponse,
 } from "@workspace/api-zod";
 import { requireAuth, requireRole, getScopedUserIds, canResolveAlerts, canAssignAlerts } from "../lib/auth";
+import {
+  assertAssignableTargetInScope,
+  assertMentionTargetsInScope,
+  createComment,
+  createHandoff,
+  listComments,
+  listHandoffs,
+  mapComment,
+  mapHandoff,
+} from "../lib/collaboration";
 
 const router: IRouter = Router();
 
@@ -34,6 +44,27 @@ function mapAlert(a: typeof alertsTable.$inferSelect) {
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   };
+}
+
+async function getAccessibleAlertOrRespond(req: Request, res: Response, id: number) {
+  const [existing] = await db.select().from(alertsTable).where(eq(alertsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Alert not found" });
+    return null;
+  }
+
+  const jwtUser = req.user!;
+  const scopedUserIds = await getScopedUserIds(jwtUser, existing.userId ?? undefined);
+  const canAccessAlert = existing.userId === null
+    ? canResolveAlerts(jwtUser.role) || canAssignAlerts(jwtUser.role)
+    : scopedUserIds === null || scopedUserIds.length > 0;
+
+  if (!canAccessAlert) {
+    res.status(403).json({ error: "Forbidden: cannot access alert outside your scope" });
+    return null;
+  }
+
+  return existing;
 }
 
 router.get("/alerts", requireAuth, async (req, res): Promise<void> => {
@@ -75,7 +106,70 @@ router.get("/alerts", requireAuth, async (req, res): Promise<void> => {
   res.json(ListAlertsResponse.parse({ alerts: alerts.map(mapAlert), total: alerts.length }));
 });
 
-// Only admin and HR can create alerts
+router.get("/alerts/:id/comments", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const alert = await getAccessibleAlertOrRespond(req, res, id);
+  if (!alert) return;
+
+  const comments = await listComments("alert", alert.id);
+  res.json({ comments: comments.map(mapComment), total: comments.length });
+});
+
+router.post("/alerts/:id/comments", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const alert = await getAccessibleAlertOrRespond(req, res, id);
+  if (!alert) return;
+
+  const commentBody = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+  const mentionedUserIds = Array.isArray(req.body?.mentionedUserIds)
+    ? req.body.mentionedUserIds.filter((value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0)
+    : [];
+
+  if (!commentBody) {
+    res.status(400).json({ error: "Comment body is required" });
+    return;
+  }
+
+  if (!(await assertMentionTargetsInScope(req.user!, mentionedUserIds))) {
+    res.status(403).json({ error: "Forbidden: cannot mention users outside your scope" });
+    return;
+  }
+
+  const comment = await createComment({
+    workflowType: "alert",
+    recordId: alert.id,
+    authorId: req.user!.userId,
+    body: commentBody,
+    mentionedUserIds,
+  });
+
+  res.status(201).json(mapComment(comment));
+});
+
+router.get("/alerts/:id/handoffs", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid ID" });
+    return;
+  }
+
+  const alert = await getAccessibleAlertOrRespond(req, res, id);
+  if (!alert) return;
+
+  const handoffs = await listHandoffs("alert", alert.id);
+  res.json({ handoffs: handoffs.map(mapHandoff), total: handoffs.length });
+});
+
 router.post("/alerts", requireAuth, requireRole("admin", "hr"), async (req, res): Promise<void> => {
   const parsed = CreateAlertBody.safeParse(req.body);
   if (!parsed.success) {
@@ -142,7 +236,6 @@ router.patch("/alerts/:id", requireAuth, async (req, res): Promise<void> => {
   if (body.data.status) updateData.status = body.data.status as AlertStatus;
   if (body.data.resolutionNotes) updateData.resolutionNotes = body.data.resolutionNotes;
 
-  // Handle status-specific metadata
   if (body.data.status === "resolved") {
     updateData.resolvedBy = jwtUser.userId;
     updateData.resolvedAt = new Date();
@@ -153,10 +246,13 @@ router.patch("/alerts/:id", requireAuth, async (req, res): Promise<void> => {
     updateData.dismissedAt = new Date();
   }
 
-  // Handle assignment
   if (body.data.assignedTo !== undefined) {
     if (!canAssignAlerts(jwtUser.role)) {
       res.status(403).json({ error: "Forbidden: cannot assign alerts" });
+      return;
+    }
+    if (!(await assertAssignableTargetInScope(jwtUser, body.data.assignedTo))) {
+      res.status(403).json({ error: "Forbidden: cannot assign alerts outside your scope" });
       return;
     }
     updateData.assignedTo = body.data.assignedTo;
@@ -172,6 +268,17 @@ router.patch("/alerts/:id", requireAuth, async (req, res): Promise<void> => {
   if (!alert) {
     res.status(404).json({ error: "Alert not found" });
     return;
+  }
+
+  if (body.data.assignedTo !== undefined && body.data.assignedTo !== existing.assignedTo) {
+    await createHandoff({
+      workflowType: "alert",
+      recordId: existing.id,
+      fromUserId: existing.assignedTo ?? null,
+      toUserId: body.data.assignedTo,
+      handedOffBy: jwtUser.userId,
+      note: typeof req.body?.handoffNote === "string" ? req.body.handoffNote.trim() || undefined : undefined,
+    });
   }
 
   res.json(UpdateAlertResponse.parse(mapAlert(alert)));

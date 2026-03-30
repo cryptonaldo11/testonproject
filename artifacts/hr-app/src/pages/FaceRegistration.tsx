@@ -5,8 +5,16 @@ import { useListWorkers, useRegisterFace, useDeleteFace, useListUsers } from "@w
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/core";
 import { Button } from "@/components/ui/button";
+import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+  OpsStatCard,
+  OpsStatGrid,
+} from "@/components/ui/ops-cockpit";
 import { ADMIN_HR_ROLES, useAuth } from "@/lib/auth";
-import { Camera, CameraOff, CheckCircle2, AlertCircle, Scan, Trash2 } from "lucide-react";
+import { Camera, CameraOff, CheckCircle2, AlertCircle, Scan, Trash2, ShieldCheck, Users, ShieldAlert } from "lucide-react";
 
 const FACE_DETECT_MODEL_URL = "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights";
 
@@ -174,6 +182,8 @@ export default function FaceRegistration() {
   };
 
   const workers = workersData?.workers ?? [];
+  const registeredCount = workers.filter((worker) => worker.hasFaceRegistered).length;
+  const unregisteredCount = workers.length - registeredCount;
 
   if (!isAdminHR) {
     return <Redirect to="/dashboard" />;
@@ -181,140 +191,172 @@ export default function FaceRegistration() {
 
   return (
     <DashboardLayout>
-      <div className="mb-6">
-        <h1 className="text-3xl font-display font-bold">Face Registration</h1>
-        <p className="text-muted-foreground">Enroll or remove worker face descriptors for biometric check-in/out.</p>
-      </div>
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title="Face registration"
+        description="Enroll and remove biometric face descriptors with clearer readiness, controlled access, and reviewer-friendly context while preserving the current registration behavior."
+      />
+
+      <OpsHero
+        badge="Biometric enrollment control"
+        icon={ShieldCheck}
+        tone={cameraError ? "attention" : "default"}
+        title="Keep biometric enrollment explainable, deliberate, and role-controlled."
+        description="This page still uses the current registration and deletion APIs, but now frames enrollment as a controlled readiness workflow that supports fair check-in and fallback review later."
+      >
+        <OpsQueueNotice
+          tone={registeredCount < workers.length ? "attention" : "success"}
+          title={workers.length === 0 ? "No workers available" : `${registeredCount} of ${workers.length} worker${workers.length === 1 ? "" : "s"} enrolled`}
+          description={workers.length === 0
+            ? "Add workers first so biometric enrollment can begin."
+            : registeredCount < workers.length
+              ? "Unenrolled workers will rely on fallback attendance paths until a face descriptor is registered."
+              : "All visible workers currently have registered descriptors in place."}
+        />
+      </OpsHero>
 
       {successMsg && (
-        <div className="mb-4 flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
           {successMsg}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Scan className="w-5 h-5 text-primary" />
-              Enroll New Face
-            </h2>
+      <OpsStatGrid>
+        <OpsStatCard label="Visible workers" value={workers.length} hint="Workers returned for biometric administration in the current scope." icon={Users} tone="success" />
+        <OpsStatCard label="Registered" value={registeredCount} hint="Workers with a stored face descriptor available for attendance verification." icon={ShieldCheck} tone={registeredCount > 0 ? "success" : "default"} />
+        <OpsStatCard label="Awaiting enrollment" value={unregisteredCount} hint="Workers still relying on manual fallback or pending enrollment setup." icon={ShieldAlert} tone={unregisteredCount > 0 ? "attention" : "success"} />
+        <OpsStatCard label="Camera status" value={cameraOn ? "Active" : "Idle"} hint={cameraError ? cameraError : cameraOn ? "Camera and face detection are active for enrollment." : "Turn on the camera after selecting a worker."} icon={cameraOn ? Camera : CameraOff} tone={cameraError ? "attention" : cameraOn ? "success" : "default"} />
+      </OpsStatGrid>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Select Worker</label>
-                <select
-                  className="w-full border rounded-lg px-3 py-2 bg-background text-sm"
-                  value={selectedWorkerId ?? ""}
-                  onChange={e => setSelectedWorkerId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                >
-                  <option value="">-- Select a worker --</option>
-                  {workers.map(w => (
-                    <option key={w.id} value={w.id}>
-                      {getUserName(w.userId)}{w.hasFaceRegistered ? " ✓ registered" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="relative w-full aspect-video rounded-2xl border-4 border-dashed border-primary/20 flex items-center justify-center bg-secondary/30 overflow-hidden">
-                {cameraOn ? (
-                  <>
-                    <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
-                    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-                    {faceDetected ? (
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-green-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        Face detected — ready to register
-                      </div>
-                    ) : modelsLoaded ? (
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 bg-orange-500/90 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        Position face in frame
-                      </div>
-                    ) : (
-                      <div className="absolute bottom-2 left-2 right-2 bg-primary/80 text-white text-xs px-3 py-1.5 rounded-lg font-medium text-center">
-                        Loading face models...
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 p-6 text-center">
-                    <Camera className="w-16 h-16 text-primary/30" />
-                    <p className="text-sm text-muted-foreground">Turn on camera to capture face</p>
-                    {cameraError && <p className="text-xs text-destructive">{cameraError}</p>}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant={cameraOn ? "outline" : "secondary"}
-                  size="sm"
-                  onClick={cameraOn ? stopCamera : startCamera}
-                  className="gap-2 flex-1"
-                  disabled={!selectedWorkerId}
-                >
-                  {cameraOn ? <CameraOff className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
-                  {cameraOn ? "Turn Off Camera" : "Turn On Camera"}
-                </Button>
-
-                <Button
-                  size="sm"
-                  className="flex-1 gap-2"
-                  disabled={!selectedWorkerId || !capturedDescriptor || registerFaceMutation.isPending}
-                  onClick={handleRegister}
-                >
-                  <Scan className="w-4 h-4" />
-                  {registerFaceMutation.isPending ? "Registering..." : "Register Face"}
-                </Button>
-              </div>
-
-              {!selectedWorkerId && (
-                <p className="text-xs text-muted-foreground text-center">Select a worker before turning on the camera.</p>
-              )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <OpsSection
+          title="Enroll new face"
+          description="Select a worker, capture a detectable face, then save the descriptor only when the enrollment signal is clear."
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Select worker</label>
+              <select
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                value={selectedWorkerId ?? ""}
+                onChange={(e) => setSelectedWorkerId(e.target.value ? parseInt(e.target.value, 10) : null)}
+              >
+                <option value="">-- Select a worker --</option>
+                {workers.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {getUserName(w.userId)}{w.hasFaceRegistered ? " ✓ registered" : ""}
+                  </option>
+                ))}
+              </select>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Worker Face Status</h2>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {workers.length === 0 && (
-                <p className="text-muted-foreground text-sm">No workers found.</p>
-              )}
-              {workers.map(w => (
-                <div key={w.id} className="flex items-center justify-between p-3 rounded-xl border bg-card">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{getUserName(w.userId)}</p>
-                    <p className="text-xs text-muted-foreground">{w.jobTitle ?? "—"}</p>
-                  </div>
-                  <div className="flex items-center gap-2 ml-3 shrink-0">
-                    {w.hasFaceRegistered ? (
-                      <>
-                        <Badge variant="secondary" className="text-green-700 bg-green-100">Registered</Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 w-8 p-0"
-                          onClick={() => handleDelete(w.id)}
-                          disabled={deleteFaceMutation.isPending}
-                          title="Remove face registration"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground">Not registered</Badge>
-                    )}
-                  </div>
+            <div className="relative aspect-video w-full overflow-hidden rounded-2xl border-4 border-dashed border-primary/20 bg-secondary/30">
+              {cameraOn ? (
+                <>
+                  <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline />
+                  <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+                  {faceDetected ? (
+                    <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 rounded-lg bg-emerald-500/90 px-3 py-1.5 text-xs font-medium text-white">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      Face detected — ready to register
+                    </div>
+                  ) : modelsLoaded ? (
+                    <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1.5 rounded-lg bg-amber-500/90 px-3 py-1.5 text-xs font-medium text-white">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      Position the face clearly in frame
+                    </div>
+                  ) : (
+                    <div className="absolute bottom-2 left-2 right-2 rounded-lg bg-primary/80 px-3 py-1.5 text-center text-xs font-medium text-white">
+                      Loading face models...
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                  <Camera className="h-16 w-16 text-primary/30" />
+                  <p className="text-sm text-muted-foreground">Turn on the camera to capture a face descriptor.</p>
+                  {cameraError && <p className="text-xs text-destructive">{cameraError}</p>}
                 </div>
-              ))}
+              )}
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="rounded-2xl border bg-background/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Enrollment guidance</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Register only when the worker is correctly selected and a clear face is detected. Removing a descriptor will return future attendance to manual fallback or re-enrollment until a new face is saved.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant={cameraOn ? "outline" : "secondary"}
+                size="sm"
+                onClick={cameraOn ? stopCamera : startCamera}
+                className="flex-1 gap-2"
+                disabled={!selectedWorkerId}
+              >
+                {cameraOn ? <CameraOff className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                {cameraOn ? "Turn off camera" : "Turn on camera"}
+              </Button>
+
+              <Button
+                size="sm"
+                className="flex-1 gap-2"
+                disabled={!selectedWorkerId || !capturedDescriptor || registerFaceMutation.isPending}
+                onClick={handleRegister}
+              >
+                <Scan className="h-4 w-4" />
+                {registerFaceMutation.isPending ? "Registering..." : "Register face"}
+              </Button>
+            </div>
+
+            {!selectedWorkerId && (
+              <p className="text-center text-xs text-muted-foreground">Select a worker before turning on the camera.</p>
+            )}
+          </div>
+        </OpsSection>
+
+        <OpsSection
+          title="Worker face status"
+          description="Use the current list to confirm who is enrolled, who still needs setup, and where biometric access should be removed."
+        >
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {workers.length === 0 && (
+              <OpsQueueNotice
+                title="No workers found"
+                description="There are no workers available for enrollment in the current scope."
+              />
+            )}
+            {workers.map((w) => (
+              <div key={w.id} className="flex items-center justify-between rounded-xl border bg-card p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{getUserName(w.userId)}</p>
+                  <p className="text-xs text-muted-foreground">{w.jobTitle ?? "—"}</p>
+                </div>
+                <div className="ml-3 flex shrink-0 items-center gap-2">
+                  {w.hasFaceRegistered ? (
+                    <>
+                      <Badge variant="success">Registered</Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 border-destructive/30 p-0 text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDelete(w.id)}
+                        disabled={deleteFaceMutation.isPending}
+                        title="Remove face registration"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">Not registered</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </OpsSection>
       </div>
     </DashboardLayout>
   );

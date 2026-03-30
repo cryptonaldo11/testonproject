@@ -13,6 +13,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Badge } from "@/components/ui/core";
 import { Button } from "@/components/ui/button";
 import {
+  OpsHero,
+  OpsPageHeader,
+  OpsQueueNotice,
+  OpsSection,
+  OpsStatCard,
+  OpsStatGrid,
+} from "@/components/ui/ops-cockpit";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -673,33 +681,66 @@ export default function Productivity() {
     window.print();
   };
 
+  const averageScore = displayedScores.length
+    ? Math.round(displayedScores.reduce((sum, score) => sum + Number(score.score), 0) / displayedScores.length)
+    : 0;
+  const riskCount = displayedScores.filter((score) => Number(score.score) < 55).length;
+  const attentionCount = displayedScores.filter((score) => Number(score.score) >= 55 && Number(score.score) < 70).length;
+  const strongCount = displayedScores.filter((score) => Number(score.score) >= 85).length;
+
   return (
     <DashboardLayout>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between print:hidden">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-display font-bold">Productivity Scores</h1>
-          <p className="text-muted-foreground">
-            Review monthly productivity, attendance reliability, punctuality, and leave impact for your visible scope.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-full border bg-card px-2 py-2 text-sm text-muted-foreground shadow-sm">
-            <Button variant="ghost" size="icon" onClick={handlePreviousMonth} aria-label="View previous month">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2 px-2">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              <span>Viewing {monthLabel(selectedMonth)} {selectedYear}</span>
+      <OpsPageHeader
+        eyebrow="Workforce operations cockpit"
+        title="Productivity scores"
+        description="Review monthly workforce productivity with clearer queue framing, explainable score inputs, and preserved export and print behavior for detailed reports."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-full border bg-card px-2 py-2 text-sm text-muted-foreground shadow-sm">
+              <Button variant="ghost" size="icon" onClick={handlePreviousMonth} aria-label="View previous month">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-2 px-2">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                <span>Viewing {monthLabel(selectedMonth)} {selectedYear}</span>
+              </div>
+              <Button variant="ghost" size="icon" onClick={handleNextMonth} aria-label="View next month">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleNextMonth} aria-label="View next month">
-              <ChevronRight className="h-4 w-4" />
+            <Button variant="outline" onClick={handleExportVisible} disabled={!displayedScores.length}>
+              <FileDown className="mr-2 h-4 w-4" /> Export visible CSV
             </Button>
           </div>
-          <Button variant="outline" onClick={handleExportVisible} disabled={!displayedScores.length}>
-            <FileDown className="mr-2 h-4 w-4" /> Export visible CSV
-          </Button>
-        </div>
-      </div>
+        }
+      />
+
+      <OpsHero
+        badge={isAdminHR ? "Workforce signal scoring" : isOperational ? "Team visibility" : "My monthly score"}
+        icon={Activity}
+        tone={riskCount > 0 ? "attention" : "default"}
+        title={isAdminHR ? "Turn attendance and punctuality into an explainable performance control view." : isOperational ? "See where the team is trending before problems become workflow issues." : "Understand your score from inputs you can actually inspect."}
+        description={isAdminHR
+          ? "Recalculation, exports, and detailed reporting are unchanged. The page now makes score distribution, priority groups, and explanation cues easier to scan before you act."
+          : isOperational
+            ? "Managers and operators still see the same scoring data, but the UI now emphasizes who is thriving, who needs attention, and how filters change the visible queue."
+            : "Your personal trend and detail report remain intact, with a stronger emphasis on how the score is composed and what changed month over month."}
+      >
+        <OpsQueueNotice
+          tone={riskCount > 0 ? "attention" : "default"}
+          title={riskCount > 0 ? `${riskCount} high-risk score${riskCount === 1 ? "" : "s"} in view` : "Explainability preserved"}
+          description={riskCount > 0
+            ? "Use detail views to confirm whether low scores are driven by attendance gaps, punctuality, leave frequency, or a combination of factors."
+            : "Detailed reports, CSV export, and print views remain available so score decisions can be shared and audited."}
+        />
+      </OpsHero>
+
+      <OpsStatGrid>
+        <OpsStatCard label="Visible scores" value={displayedScores.length} hint={`Records shown for ${monthLabel(selectedMonth)} ${selectedYear}.`} icon={Users} tone="success" />
+        <OpsStatCard label="Average score" value={`${averageScore}/100`} hint="Average across the current filtered view." icon={TrendingUp} tone={averageScore >= 70 ? "success" : "attention"} />
+        <OpsStatCard label="Needs attention" value={attentionCount} hint="Scores between 55 and 69 in the visible set." icon={TrendingDown} tone={attentionCount > 0 ? "attention" : "default"} />
+        <OpsStatCard label="High risk / strong" value={`${riskCount} / ${strongCount}`} hint="Low-risk and high-performing ends of the visible score range." icon={Building2} tone={riskCount > 0 ? "attention" : "success"} />
+      </OpsStatGrid>
 
       {isAdminHR && (
         <Card className="mb-6 p-5 print:hidden">
